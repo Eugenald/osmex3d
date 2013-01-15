@@ -40,17 +40,17 @@ require_once("config.php");
         <script type="text/javascript" src="../scripts/Functions.js"></script> 
 
 		<script>
-//Класс тайл		
+//Class of tile		
 function Tile () {
     this.id;
-	this.lvl;//уровень
+	this.lvl;//level
 	this.center;//THREE.Vector3
-    this.childs = new Array();//4 id потомков 
+    this.childs = new Array();//4 id of descendants 
     this.childs[0];
     this.childs[1];
     this.childs[2];
 	this.childs[3];
-    this.prnt;//предок
+    this.prnt;//parent
 	this.triangleGeometry = new THREE.Geometry();
 	this.triangleGeometry.faces.push(new THREE.Face3(0,1,3));
 	this.triangleGeometry.faces.push(new THREE.Face3(1,2,3));
@@ -77,7 +77,7 @@ function Tile () {
 			
 
 <?php
-//выбираем с базы 3 уровня детализации и заполняем тайл
+//Choose from db 3 levels of detail and fill them
 $query= <<<EOD
 SELECT tile.id,tile.lvl,ar_verts.verts,tile.id_t_c1,tile.id_t_c2,tile.id_t_c3,tile.id_t_c4,
 tile.id_t_p FROM ar_verts,tile WHERE tile.id>=0 and tile.id<=20 and ar_verts.id=tile.id_av
@@ -200,7 +200,7 @@ print $js;
 				triangleMesh[0].position.set(0.0, 0.0, 0.0);
 				scene.add(triangleMesh[0]);*/
 				
-				//заполняем меши наших тайлов и добавляем в сцену
+				//fill the meshes of our tiles and add to the scene
 		for ( i = 0; i <tiles.length;i++) {
                  	  triangleMesh[i] = new THREE.Mesh(tiles[i].triangleGeometry, triangleMaterial);
 				      triangleMesh[i].position.set(0.0, 0.0, 0.0);
@@ -261,7 +261,7 @@ print $js;
 			   //land_func(53)
 			}
 			
-			//функции вызываюшая при ответе с сервера на запрос получения тайла по айди
+			//function is called in response to a request from the server to get the tile by id
 			function update_data(s) {
 			//var div = document.getElementById('cont');
             //alert(s);
@@ -361,6 +361,7 @@ print $js;
 
 			  flagDrop=false;
 			  chldsExist=true;
+			  //if the file exists but is not loaded call func 'land_func(IdTile)' to get data
               if(tiles[id].childs[0]>=0&&tiles[tiles[id].childs[0]]==null){land_func(tiles[id].childs[0]);chldsExist=false;}
               if(tiles[id].childs[1]>=0&&tiles[tiles[id].childs[1]]==null){land_func(tiles[id].childs[1]);chldsExist=false;}
 			  if(tiles[id].childs[2]>=0&&tiles[tiles[id].childs[2]]==null){land_func(tiles[id].childs[2]);chldsExist=false;}
@@ -368,7 +369,7 @@ print $js;
 						
 			  if(tiles[id].childs[0]>=0&&chldsExist){	 
 
-			  //константное растояние по уровню текущего тайла
+			  //constant distance of the current tile by level
 			  activatedDistChild=10.0-((tiles[id].lvl+1)*1.5)
 			  //console.debug("activatedDistChild "+activatedDistChild)
 
@@ -377,9 +378,9 @@ print $js;
 				ch_id3=tiles[id].childs[2];
 				ch_id4=tiles[id].childs[3];
 				console.debug("id "+id)
-                //хотя бы для одного чайлда растояние меньше				
+                //at least one distance less Child				
 			    if(getDistance(cam,ch_id1)<activatedDistChild||getDistance(cam,ch_id2)<activatedDistChild||getDistance(cam,ch_id3)<activatedDistChild||getDistance(cam,ch_id4)<activatedDistChild){flagDrop=true;}				
-				//опускаемя на уровень ниже(делим квад на 4)
+				//drop to the level below (divide by 4 quad)
 				   if(flagDrop){
 				    
 				    //wrt("del "+id)
@@ -428,7 +429,7 @@ print $js;
 				            }
 				 
 				 flagRise=false;
-				 //имеет ли тайл предка
+				 //does tile have а parent
 				 if(tiles[id].prnt>=0){
 				    prntId=tiles[id].prnt;
 				     ch_id1=tiles[prntId].childs[0];
@@ -439,12 +440,12 @@ print $js;
 				    //console.debug("cur_t_ids.indexOf(ch_id4) "+cur_t_ids.indexOf(ch_id4))
 					//if(cur_t_ids.indexOf(ch_id4)>=0&&cur_t_ids.indexOf(ch_id3)>=0&&cur_t_ids.indexOf(ch_id2)>=0&&cur_t_ids.indexOf(ch_id1)>=0){
 					if(triangleMesh[ch_id4].visible&&triangleMesh[ch_id3].visible&&triangleMesh[ch_id2].visible&&triangleMesh[ch_id1].visible){
-					//константное растояние по уровню тайла предка
+					//constant distance of the tileparent by level
 				    activatedDistPrnt=10.0-((tiles[prntId].lvl+1)*1.5)
 					console.debug("activatedDistPrnt "+activatedDistPrnt)
-					//растояние к всем чайлдам больше константного к предку
+					//distance to all tiles is bigger than constant to parent
 				 	if(getDistance(cam,ch_id4)>activatedDistPrnt&&getDistance(cam,ch_id3)>activatedDistPrnt&&getDistance(cam,ch_id2)>activatedDistPrnt&&getDistance(cam,ch_id1)>activatedDistPrnt){flagRise=true;}
-                    //поднимаемся на уровень выше
+                    //rise to a higher level
 				    if(flagRise){					   
 					  //prnt_indx=cur_t_ids.indexOf(prntId);
 					  //if(prnt_indx<0){
