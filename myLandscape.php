@@ -128,6 +128,48 @@ print $js;
 
 ?>
 
+//Object ( dynamically add the necessary tiles)
+
+var TLoad = new function () {
+    this.ready=true;                 //a flag of readiness
+    this.arTileForAdd = new Array(); //the queue of  tiles for loading
+
+	   // check the queue overflow
+this.isFull = function () {
+      if(this.arTileForAdd.length>=4)return true;  
+	  else{return false;}
+    };
+
+	  //check tile on present in the queue	  
+this.tileinQueue= function (IdTile) {           
+      if(this.arTileForAdd.indexOf(IdTile)>=0)return true;
+	  else{return false;}
+    };
+
+	  //add tile in queue
+this.pushTile = function (IdTile) {              
+    if(!this.tileinQueue(IdTile)&&!this.isFull())this.arTileForAdd.push(IdTile);
+};	
+
+      //load and check flag of readiness
+this.loadTile = function () {
+   if(this.arTileForAdd.length>=1&&this.ready==true){
+    id=this.arTileForAdd[this.arTileForAdd.length-1];
+    if(id>=0){this.ready=false;land_func(id);}
+	                               }
+};
+	
+	//set flag of readiness
+this.loaded = function () { 
+    this.ready=true;
+    return this.arTileForAdd.pop();  //delete the tile from the queue
+};
+		
+}
+
+
+
+
 			var camera, controls, scene, renderer;
 			
 			var texture;
@@ -247,7 +289,7 @@ print $js;
 			   console.debug("tiles[3].center.x "+tiles[3].center.x)
 			   console.debug("tiles[4].center.x "+tiles[4].center.x)*/
 			   
-			   //setTimeout(verify, 250)
+			   setTimeout(verify, 250)
 			   
 			   //land_func(53)
 			}
@@ -288,7 +330,9 @@ print $js;
 				      triangleMesh[jstr.id].position.set(0.0, 0.0, 0.0);
 					  scene.add(triangleMesh[jstr.id]);
 					  triangleMesh[jstr.id].visible=false;
-
+					  
+					  
+console.debug("load id  "+TLoad.loaded())	
 				                      }
 
 			function onWindowResize() {
@@ -312,13 +356,10 @@ print $js;
 			}
 			
 			function verify(){
-				/*console.debug(" ")	
-				console.debug("cur_t_ids.length "+cur_t_ids.length)				    
-				for(i=0;i<cur_t_ids.length;i++){
-				console.debug("cur_t_ids[i] "+cur_t_ids[i])
-				dyn_lvl(camera.position,tiles[cur_t_ids[i]].id);					
-				                               }
-			    setTimeout(verify, 250)*/
+				console.debug("TLoad.arTileForAdd.length "+TLoad.arTileForAdd.length)	
+                TLoad.loadTile();
+				
+			    setTimeout(verify, 250)
 			}
 
 			function render() {
@@ -353,10 +394,10 @@ print $js;
 			  flagDrop=false;
 			  chldsExist=true;
 			  //if the file exists but is not loaded call func 'land_func(IdTile)' to get data
-              if(tiles[id].childs[0]>=0&&tiles[tiles[id].childs[0]]==null){land_func(tiles[id].childs[0]);chldsExist=false;}
-              if(tiles[id].childs[1]>=0&&tiles[tiles[id].childs[1]]==null){land_func(tiles[id].childs[1]);chldsExist=false;}
-			  if(tiles[id].childs[2]>=0&&tiles[tiles[id].childs[2]]==null){land_func(tiles[id].childs[2]);chldsExist=false;}
-			  if(tiles[id].childs[3]>=0&&tiles[tiles[id].childs[3]]==null){land_func(tiles[id].childs[3]);chldsExist=false;}
+              if(tiles[id].childs[0]>=0&&tiles[tiles[id].childs[0]]==null){TLoad.pushTile(tiles[id].childs[0]);chldsExist=false;}
+              if(tiles[id].childs[1]>=0&&tiles[tiles[id].childs[1]]==null){TLoad.pushTile(tiles[id].childs[1]);chldsExist=false;}
+			  if(tiles[id].childs[2]>=0&&tiles[tiles[id].childs[2]]==null){TLoad.pushTile(tiles[id].childs[2]);chldsExist=false;}
+			  if(tiles[id].childs[3]>=0&&tiles[tiles[id].childs[3]]==null){TLoad.pushTile(tiles[id].childs[3]);chldsExist=false;}
 						
 			  if(tiles[id].childs[0]>=0&&chldsExist){	 
 
