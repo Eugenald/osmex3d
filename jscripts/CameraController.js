@@ -1,7 +1,7 @@
 
-OSMEX.CameraController = function ( object, domElement )
+THREE.CameraController = function ( object, domElement )
 {
-    THREE.EventDispatcher.call( this );
+    THREE.EventTarget.call( this );
 
     this.object = object;
     this.domElement = ( domElement !== undefined ) ? domElement : document;
@@ -206,7 +206,7 @@ OSMEX.CameraController = function ( object, domElement )
 
         event.preventDefault();
 
-        if ( event.button === 2 ) {
+        if ( event.button === 0 ) {
 
             state = STATE.ROTATE;
 
