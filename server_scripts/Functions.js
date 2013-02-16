@@ -35,6 +35,8 @@ function processReqChange()
                 req.statusText);
         }
     }
+	
+	req = null;
 }
 
 function land_func(id){
