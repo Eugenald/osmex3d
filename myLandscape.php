@@ -42,18 +42,35 @@ require_once("server_scripts/config.php");
 		<script>
 //Class of tile		
 function Tile () {
-    this.id=-1;
+    this.id;
+	this.refcount=-1;
 	this.tex;
 	this.lvl;//level
 	this.center;//THREE.Vector3
     this.childs = new Array();//4 id of descendants 
-    this.childs[0];
-    this.childs[1];
-    this.childs[2];
-	this.childs[3];
+    this.childs[0]=-1;
+    this.childs[1]=-1;
+    this.childs[2]=-1;
+	this.childs[3]=-1;
     this.prnt;//parent
 	this.triangleGeometry = new THREE.Geometry();
+	this.destroy = function () {
+         delete this.id;
+		 delete this.refcount;
+		 delete this.tex;
+		 delete this.lvl;
+		 delete this.center;this.center=null;
+		 this.childs.length = 0;delete this.childs;this.childs=null;
+		 delete this.prnt;
+		 delete this.triangleGeometry;this.triangleGeometry=null;
+    };
 	
+}
+
+//Class of cache tileprnt		
+function TileCache () {
+    this.tile=-1;
+	this.refcounter=0;
 }
 
 			if ( ! Detector.webgl ) Detector.addGetWebGLMessage();
@@ -61,8 +78,10 @@ function Tile () {
 			var container, stats;
 			
 			arrCurRoot = new Array();
+			arrTile = new Array();
 			//Arrgarbg = new Array();
 			newArrCR=new Array();
+			arrCachePrnt=new Array();
 			var MAXID=0;
 			var timerid=0;
 			cur_root=0;
@@ -113,10 +132,10 @@ cur_root.id=$id;
 zxy='$tex'.split(" ");
 cur_root.tex=''+zxy[0]+'/'+zxy[1]+'/'+zxy[2];
 cur_root.lvl=$lvl;
-cur_root.childs[0]=new Tile();
-cur_root.childs[1]=new Tile();
-cur_root.childs[2]=new Tile();
-cur_root.childs[3]=new Tile();
+cur_root.childs[0]=-1;
+cur_root.childs[1]=-1;
+cur_root.childs[2]=-1;
+cur_root.childs[3]=-1;
 cur_root.prnt=$id_t_p;
 var jstr=JSON.parse('$json_str');
 var arr_verts = jstr.verts;
@@ -151,7 +170,8 @@ scene.add(triangleMesh[cur_root.id]);
 //console.debug("tile N "+i)
 triangleMesh[cur_root.id].visible=true;
 
-arrCurRoot.push(cur_root);
+arrTile.push(cur_root);
+arrCurRoot.push(cur_root.id);
 //Object ( dynamically add the necessary tiles)
 
 var TLoad = new function (maxiId) {
@@ -359,31 +379,41 @@ this.loaded = function () {
 				jstr=JSON.parse(''+s);
 				//console.debug("cur_root.id  "+cur_root.id)
 				
-				if(TLoad.idforloadroot==jstr.id)flagroot=true;
-
+				//if(TLoad.idforloadroot==jstr.id)flagroot=true;
+                 findtile=false;
 				 for(j in arrCurRoot){
-				    cur_tile=arrCurRoot[j];
-					if(flagroot){
-					   if(cur_tile.id==jstr.id){/*console.debug("create tile  "+jstr.id+" "+TLoad.idforloadroot);*/tile=cur_tile;break;}
-					            }
-					else{			
-                       if(cur_tile.id*4+1==jstr.id){tile=cur_tile.childs[0];tile.id=jstr.id;tile.lvl=cur_tile.lvl+1;break;}
-					   if(cur_tile.id*4+2==jstr.id){tile=cur_tile.childs[1];tile.id=jstr.id;tile.lvl=cur_tile.lvl+1;break;}
-					   if(cur_tile.id*4+3==jstr.id){tile=cur_tile.childs[2];tile.id=jstr.id;tile.lvl=cur_tile.lvl+1;break;}
-					   if(cur_tile.id*4+4==jstr.id){tile=cur_tile.childs[3];tile.id=jstr.id;tile.lvl=cur_tile.lvl+1;break;}
-					    }
-					 delete cur_tile;
+				    cur_ID=arrCurRoot[j];
+					//if(flagroot){
+					   //if(cur_ID==jstr.id){console.debug("create tile  "+jstr.id+" "+arrTile[cur_ID]);tile=arrTile[cur_ID];flagroot=true;break;}
+					          //  }
+					//else{			
+                       if(cur_ID*4+1==jstr.id){arrTile[cur_ID*4+1]=new Tile();tile=arrTile[cur_ID*4+1];tile.id=jstr.id;arrTile[cur_ID].childs[0]=jstr.id;console.debug("arrTile["+cur_ID+"].childs[0] "+jstr.id);tile.lvl=arrTile[cur_ID].lvl+1;findtile=true;break;}
+					   if(cur_ID*4+2==jstr.id){arrTile[cur_ID*4+2]=new Tile();tile=arrTile[cur_ID*4+2];tile.id=jstr.id;arrTile[cur_ID].childs[1]=jstr.id;console.debug("arrTile["+cur_ID+"].childs[1] "+jstr.id);tile.lvl=arrTile[cur_ID].lvl+1;findtile=true;break;}
+					   if(cur_ID*4+3==jstr.id){arrTile[cur_ID*4+3]=new Tile();tile=arrTile[cur_ID*4+3];tile.id=jstr.id;arrTile[cur_ID].childs[2]=jstr.id;console.debug("arrTile["+cur_ID+"].childs[2] "+jstr.id);tile.lvl=arrTile[cur_ID].lvl+1;findtile=true;break;}
+					   if(cur_ID*4+4==jstr.id){arrTile[cur_ID*4+4]=new Tile();tile=arrTile[cur_ID*4+4];tile.id=jstr.id;arrTile[cur_ID].childs[3]=jstr.id;console.debug("arrTile["+cur_ID+"].childs[3] "+jstr.id);tile.lvl=arrTile[cur_ID].lvl+1;findtile=true;break;}
+					   // }
+					 delete cur_ID;
                      //console.debug("del cur "+r);
-                     cur_tile=null					 
+                     cur_ID=null					 
 					}
+					
+				if(!findtile&&triangleMesh[(jstr.id*4+1)]&&triangleMesh[(jstr.id*4+2)]&&triangleMesh[(jstr.id*4+3)]&&triangleMesh[(jstr.id*4+4)]/*&&arrTile[jstr.id]*/){
+				/*console.debug("create tile  "+jstr.id+" "+arrTile[jstr.id]);*/
+				arrTile[jstr.id]=new Tile();
+				tile=arrTile[jstr.id];
+				tile.id=jstr.id;
+				lvl=-1;
+				for(t=0;t<=MAXID;t=(t*4+4)){lvl++;if(jstr.id<=t)break}
+				tile.lvl=lvl
+				flagroot=true;}	
                 
 				zxy=jstr.tex.split(" ");
                 tile.tex=''+zxy[0]+'/'+zxy[1]+'/'+zxy[2];
 				tile.prnt=jstr.prnt;
-				tile.childs[0]=new Tile();
+				/*tile.childs[0]=new Tile();
 				tile.childs[1]=new Tile();
 				tile.childs[2]=new Tile();
-				tile.childs[3]=new Tile();
+				tile.childs[3]=new Tile();*/
                 //tile.prnt=cur_tile.id;
 
                 var arr_verts = jstr.verts;
@@ -414,12 +444,21 @@ this.loaded = function () {
 				    triangleMesh[jstr.id].position.set(0.0, 0.0, 0.0);
 					scene.add(triangleMesh[jstr.id]);
 					triangleMesh[jstr.id].visible=true;
-					//console.debug("del  "+(jstr.id*4+1)+" "+TLoad.ReadyForRoot);
+					console.debug("crt  "+jstr.id+" ");
+					console.debug("del  "+(jstr.id*4+1)+" ");
+					console.debug("del  "+(jstr.id*4+2)+" ");
+					console.debug("del  "+(jstr.id*4+3)+" ");
+					console.debug("del  "+(jstr.id*4+4)+" ");
                     deltilemesh((jstr.id*4+1));
 					deltilemesh((jstr.id*4+2));
 					deltilemesh((jstr.id*4+3));
 					deltilemesh((jstr.id*4+4));
+					deltile((jstr.id*4+1));
+					deltile((jstr.id*4+2));
+					deltile((jstr.id*4+3));
+					deltile((jstr.id*4+4));
 					
+					arrCurRoot.unshift(tile.id);
 					TLoad.idforloadroot=-1;
 		            TLoad.ReadyForRoot=true;
 					TLoad.arTileForAdd.splice(0,TLoad.arTileForAdd.length);//=new Array();
@@ -459,25 +498,50 @@ this.loaded = function () {
 			}
 			
 			function getDistance(cam,tile){
+			    //console.debug("dist for id "+tile)
 			    cam_pos=cam.position
-				ax=Math.max(cam_pos.x,tile.center.x)-Math.min(cam_pos.x,tile.center.x);
+				ax=Math.max(cam_pos.x,arrTile[tile].center.x)-Math.min(cam_pos.x,arrTile[tile].center.x);
 				//console.debug("cam.x "+cam.x+"tiles["+(id)+"].center.x "+tiles[id].center.x)
 				//console.debug("ax "+ax)
-				ay=Math.max(cam_pos.y,tile.center.y)-Math.min(cam_pos.y,tile.center.y);
-				az=Math.max(cam_pos.z,tile.center.z)-Math.min(cam_pos.z,tile.center.z);
+				ay=Math.max(cam_pos.y,arrTile[tile].center.y)-Math.min(cam_pos.y,arrTile[tile].center.y);
+				az=Math.max(cam_pos.z,arrTile[tile].center.z)-Math.min(cam_pos.z,arrTile[tile].center.z);
 				cD=Math.sqrt(ax*ax+ay*ay+az*az);
 				//cD=1 * cD.toFixed(1)
-				//console.debug("cR "+cD+"id "+tile.id)
+				//console.debug("cR "+cD+"id "+tile)
                 return cD				
 			}
 			
-			function deltilemesh(id){
-			    console.debug("del "+"id "+" "+id)
+			function deltilemesh(id,req){
+			    //console.debug("del "+"id "+" "+id)
+				if(req==false)req=false;
+				else{req=true;}
 			    scene.remove(triangleMesh[id]);
 			    renderer.deallocateObject(triangleMesh[id]);
 				r=delete triangleMesh[id];
 				triangleMesh[id]=null
+				if(req){
+				  if(triangleMesh[(id*4+1)])deltilemesh((id*4+1));
+				  if(triangleMesh[(id*4+2)])deltilemesh((id*4+2));
+				  if(triangleMesh[(id*4+3)])deltilemesh((id*4+3));
+				  if(triangleMesh[(id*4+4)])deltilemesh((id*4+4));
+				}
+				//triangleMesh.splice(id,1);
 				console.debug("del "+triangleMesh[id]+" id "+id+" "+r)
+			}
+
+            function deltile(id,req){
+                if(req==false)req=false;
+				else{req=true;}			
+				arrTile[id].destroy();
+				delete arrTile[id];
+				arrTile[id]=null;
+				if(req){
+				  if(arrTile[(id*4+1)])deltile((id*4+1));
+				  if(arrTile[(id*4+2)])deltile((id*4+2));
+				  if(arrTile[(id*4+3)])deltile((id*4+3));
+				  if(arrTile[(id*4+4)])deltile((id*4+4));
+				}
+				console.debug("Delete "+arrTile[id]+" id "+id)
 			}
 			
 			function render() {
@@ -485,39 +549,43 @@ this.loaded = function () {
 				console.debug(" ")
 				console.debug(" ")
 				//console.debug("tiles.length "+tiles.length)	
-
-				j=0;
+//
 				new_root=0;
 				flagRise=false;
 				arrCheckTile = new Array();
 				//newArrCR=new Array();
 				console.debug("arrCurRoot.length "+arrCurRoot.length)	
-				for(;j<arrCurRoot.length&&TLoad.idforloadroot!=arrCurRoot[j].id&&TLoad.ReadyForRoot;j++){
-				  cur_root=arrCurRoot[j];
+				//&&TLoad.idforloadroot!=arrCurRoot[j]&&TLoad.ReadyForRoot
+				for(j=0;j<arrCurRoot.length;j++){
+				  cur_ID=arrCurRoot[j];
+				  console.debug("cur_ID "+cur_ID)
 				    flagDrop=false;
 			        chldsExist=true;
 				    //if the file exists but is not loaded call func 'land_func(IdTile)' to get data
 					//console.debug("cur_root.childs[3].id "+cur_root.childs[3].id)
-					if(cur_root.childs[0].id<0){TLoad.pushTile(cur_root.id*4+1);chldsExist=false;}
-					if(cur_root.childs[1].id<0){TLoad.pushTile(cur_root.id*4+2);chldsExist=false;}
-					if(cur_root.childs[2].id<0){TLoad.pushTile(cur_root.id*4+3);chldsExist=false;}
-					if(cur_root.childs[3].id<0){TLoad.pushTile(cur_root.id*4+4);chldsExist=false;}
+					if(arrTile[cur_ID].childs[0]<0){TLoad.pushTile(cur_ID*4+1);chldsExist=false;}
+					if(arrTile[cur_ID].childs[1]<0){TLoad.pushTile(cur_ID*4+2);chldsExist=false;}
+					if(arrTile[cur_ID].childs[2]<0){TLoad.pushTile(cur_ID*4+3);chldsExist=false;}
+					if(arrTile[cur_ID].childs[3]<0){TLoad.pushTile(cur_ID*4+4);chldsExist=false;}
 					//console.debug("cur_root.childs[3] "+cur_root.childs[3].id)
 					//console.debug("lvl "+cur_root.lvl)
 					//console.debug("chldsExist "+chldsExist)
 					//break
-					console.debug("cur_root.id "+cur_root.id)
-			  if(cur_root.childs[0].id>=0&&chldsExist){	 
+					
+					//console.debug("arrTile[cur_ID].childs[0] "+arrTile[cur_ID].childs[0])
+					//console.debug("chldsExist "+chldsExist)
+			  if(arrTile[cur_ID].childs[0]>=0&&chldsExist){	 
 			  //constant distance of the current tile by level
-			  lvlconst=(cur_root.lvl*3.0);
+			  lvlconst=(arrTile[cur_ID].lvl*3.0);
 			  //console.debug("tiles[id] "+id+" "+lvlconst+" (lvlconst) "+lvlconst)
 			  activatedDistChild=21-lvlconst;
+			  //console.debug("arrTile[cur_ID].lvl "+arrTile[cur_ID].lvl)
 			  //console.debug("activatedDistChild "+activatedDistChild)
 				//console.debug("id "+id)
                 //at least one distance less Child
 				
 				
-			    if(getDistance(camera,cur_root.childs[0])<activatedDistChild||getDistance(camera,cur_root.childs[1])<activatedDistChild||getDistance(camera,cur_root.childs[2])<activatedDistChild||getDistance(camera,cur_root.childs[3])<activatedDistChild){
+			    if(getDistance(camera,(cur_ID*4+1))<activatedDistChild||getDistance(camera,(cur_ID*4+2))<activatedDistChild||getDistance(camera,(cur_ID*4+3))<activatedDistChild||getDistance(camera,(cur_ID*4+4))<activatedDistChild){
 				flagDrop=true;}
 				
 				/*if(getDistance(camera,ch_id2)<activatedDistChild){flagDrop=true;}	
@@ -526,7 +594,9 @@ this.loaded = function () {
 				//drop to the level below (divide by 4 quad)
 				   if(flagDrop){
 				    
-					deltilemesh(cur_root.id)
+					deltilemesh(cur_ID,false)
+					deltile(cur_ID,false)
+					
 
                      //texture=THREE.ImageUtils.loadTexture('http://c.tile.openstreetmap.org/'+tile.tex+".png")
 		              triangleMaterial = new THREE.MeshBasicMaterial({
@@ -536,10 +606,10 @@ this.loaded = function () {
                         'overdraw': true
 				                       });				
 
-                 	  triangleMesh[cur_root.childs[0].id] = new THREE.Mesh(cur_root.childs[0].triangleGeometry, triangleMaterial);
-				      triangleMesh[cur_root.childs[0].id].position.set(0.0, 0.0, 0.0);
-					  scene.add(triangleMesh[cur_root.childs[0].id]);
-					  triangleMesh[cur_root.childs[0].id].visible=true;
+                 	  triangleMesh[(cur_ID*4+1)] = new THREE.Mesh(arrTile[(cur_ID*4+1)].triangleGeometry, triangleMaterial);
+				      triangleMesh[(cur_ID*4+1)].position.set(0.0, 0.0, 0.0);
+					  scene.add(triangleMesh[(cur_ID*4+1)]);
+					  triangleMesh[(cur_ID*4+1)].visible=true;
 					  
 					  
 					  //texture=THREE.ImageUtils.loadTexture('http://c.tile.openstreetmap.org/'+tile.tex+".png")
@@ -550,10 +620,10 @@ this.loaded = function () {
                         'overdraw': true
 				                       });				
 
-                 	  triangleMesh[cur_root.childs[1].id] = new THREE.Mesh(cur_root.childs[1].triangleGeometry, triangleMaterial);
-				      triangleMesh[cur_root.childs[1].id].position.set(0.0, 0.0, 0.0);
-					  scene.add(triangleMesh[cur_root.childs[1].id]);
-					  triangleMesh[cur_root.childs[1].id].visible=true;
+                 	  triangleMesh[(cur_ID*4+2)] = new THREE.Mesh(arrTile[(cur_ID*4+2)].triangleGeometry, triangleMaterial);
+				      triangleMesh[(cur_ID*4+2)].position.set(0.0, 0.0, 0.0);
+					  scene.add(triangleMesh[(cur_ID*4+2)]);
+					  triangleMesh[(cur_ID*4+2)].visible=true;
 					  
 					  
 					  //texture=THREE.ImageUtils.loadTexture('http://c.tile.openstreetmap.org/'+tile.tex+".png")
@@ -564,10 +634,10 @@ this.loaded = function () {
                         'overdraw': true
 				                       });				
 
-                 	  triangleMesh[cur_root.childs[2].id] = new THREE.Mesh(cur_root.childs[2].triangleGeometry, triangleMaterial);
-				      triangleMesh[cur_root.childs[2].id].position.set(0.0, 0.0, 0.0);
-					  scene.add(triangleMesh[cur_root.childs[2].id]);
-					  triangleMesh[cur_root.childs[2].id].visible=true;
+                 	  triangleMesh[(cur_ID*4+3)] = new THREE.Mesh(arrTile[(cur_ID*4+3)].triangleGeometry, triangleMaterial);
+				      triangleMesh[(cur_ID*4+3)].position.set(0.0, 0.0, 0.0);
+					  scene.add(triangleMesh[(cur_ID*4+3)]);
+					  triangleMesh[(cur_ID*4+3)].visible=true;
 					  
 					  
 					  //texture=THREE.ImageUtils.loadTexture('http://c.tile.openstreetmap.org/'+tile.tex+".png")
@@ -578,17 +648,20 @@ this.loaded = function () {
                         'overdraw': true
 				                       });				
 
-                 	  triangleMesh[cur_root.childs[3].id] = new THREE.Mesh(cur_root.childs[3].triangleGeometry, triangleMaterial);
-				      triangleMesh[cur_root.childs[3].id].position.set(0.0, 0.0, 0.0);
-					  scene.add(triangleMesh[cur_root.childs[3].id]);
-					  triangleMesh[cur_root.childs[3].id].visible=true;
+                 	  triangleMesh[(cur_ID*4+4)] = new THREE.Mesh(arrTile[(cur_ID*4+4)].triangleGeometry, triangleMaterial);
+				      triangleMesh[(cur_ID*4+4)].position.set(0.0, 0.0, 0.0);
+					  scene.add(triangleMesh[(cur_ID*4+4)]);
+					  triangleMesh[(cur_ID*4+4)].visible=true;
 					  
 					 //console.debug("tileDrop "+tileDrop.id)
 					// console.debug("ch_id4 "+ch_id4.id)
-					del_indx=arrCurRoot.indexOf(cur_root);
-					if(del_indx>=0){arrCurRoot.splice(del_indx,1);arrCurRoot.push(cur_root.childs[0]);arrCurRoot.push(cur_root.childs[1]);arrCurRoot.push(cur_root.childs[2]);arrCurRoot.push(cur_root.childs[3]);}
+					del_indx=arrCurRoot.indexOf(cur_ID);
+					console.debug("DEL "+del_indx)
+					if(del_indx>=0){arrCurRoot.splice(del_indx,1);arrCurRoot.push((cur_ID*4+1));arrCurRoot.push((cur_ID*4+2));arrCurRoot.push((cur_ID*4+3));arrCurRoot.push((cur_ID*4+4));}
 						
 					console.debug("break ")
+					//r=delete cur_root
+					//cur_root=null
 					break;			
                                 }
 				    
@@ -597,15 +670,24 @@ this.loaded = function () {
 							
 				 flagRise=false;
 				 //does tile have à parent
-				 if(TLoad.ReadyForRoot&&cur_root.prnt>=0){
-				 //console.debug("newArrCR.length "+newArrCR.length)
-				    prntId=cur_root.prnt;
-					arrCheckTile.splice(0,arrCheckTile.length);
-					for(i in arrCurRoot){
-					     if(arrCurRoot[i].prnt==prntId)arrCheckTile.push(i);
-				        }
-					if(arrCheckTile.length==4){
-                      					
+				 if(TLoad.ReadyForRoot&&arrTile[cur_ID].prnt>=0){
+				    //console.debug("(arrTile[cur_ID].lvl-1) "+(arrTile[cur_ID].lvl-1))
+				    prntId=arrTile[cur_ID].prnt;
+					ch_id1=4*prntId+1;
+					ch_id2=4*prntId+2;
+					ch_id3=4*prntId+3;
+					ch_id4=4*prntId+4;
+					allchexist=true;
+					console.debug(ch_id1+"  arrTile[ch_id1] "+arrTile[ch_id1])
+					console.debug(ch_id2+"  arrTile[ch_id2] "+arrTile[ch_id2])
+					console.debug(ch_id3+"  arrTile[ch_id3] "+arrTile[ch_id3])
+					console.debug(ch_id4+"  arrTile[ch_id4] "+arrTile[ch_id4])
+					if(!arrTile[ch_id1]){allchexist=false;}
+					if(!arrTile[ch_id2]){allchexist=false;}
+					if(!arrTile[ch_id3]){allchexist=false;}
+					if(!arrTile[ch_id4]){allchexist=false;}
+					if(allchexist){
+                      console.debug("allchexist "+allchexist)					
 				     /*ch_id1=arrCheckTile[0];console.debug("ch_id1.id "+ch_id1.id)
 					 ch_id2=arrCheckTile[1];console.debug("ch_id2.id "+ch_id2.id)
 					 ch_id3=arrCheckTile[2];console.debug("ch_id3.id "+ch_id3.id)
@@ -613,17 +695,29 @@ this.loaded = function () {
 					 
 
 					//constant distance of the tileparent by level
-					lvlconst=(cur_root.lvl-1)*3.0;if(lvlconst<=0)lvlconst=0
+					lvlconst=(arrTile[cur_ID].lvl-1)*3.0;if(lvlconst<=0)lvlconst=0
 				    activatedDistPrnt=21.0-lvlconst
-					console.debug("activatedDistPrnt "+activatedDistPrnt)
+					//console.debug("activatedDistPrnt "+activatedDistPrnt)
 					//distance to all tiles is bigger than constant to parent
-				 	if(getDistance(camera,arrCurRoot[arrCheckTile[0]])>activatedDistPrnt&&getDistance(camera,arrCurRoot[arrCheckTile[1]])>activatedDistPrnt&&getDistance(camera,arrCurRoot[arrCheckTile[2]])>activatedDistPrnt&&getDistance(camera,arrCurRoot[arrCheckTile[3]])>activatedDistPrnt){
+				 	if(getDistance(camera,ch_id1)>activatedDistPrnt&&getDistance(camera,ch_id2)>activatedDistPrnt&&getDistance(camera,ch_id3)>activatedDistPrnt&&getDistance(camera,ch_id4)>activatedDistPrnt){
 					flagRise=true;
+					console.debug("verify rising ")
+					count=0;
+					for(i=0 ;i< arrCurRoot.length;i++){
+					     if(arrTile[arrCurRoot[i]].prnt==prntId){console.debug("now we will have deleted "+arrCurRoot[i]);arrCurRoot[i]=0;count++;}
+				        }
+					arrCurRoot.sort();	
+					for(i=0 ;i<count;i++)arrCurRoot.shift();	
+					//arrCurRoot.unshift(new_root.id);
 					new_root=new Tile();
 					new_root.id=prntId;
-					new_root.lvl=cur_root.lvl-1;
+					//new_root.lvl=arrTile[cur_ID].lvl-1;
+					//arrTile[new_root.id]=new_root;
 					TLoad.prepareRootID(new_root.id);
-					console.debug("new_root.id "+new_root.id)
+					console.debug("New id "+new_root.id)
+                    console.debug("arrCurRoot.length "+arrCurRoot.length)
+					/*delete cur_root
+					cur_root=null*/
 					break;
 					}
 
@@ -634,57 +728,18 @@ this.loaded = function () {
 							
 
 							
-					r=delete cur_root
-					cur_root=null
+					///*r=*/delete cur_root
+					//cur_root=null
                     //console.debug("del  "+r);					
 				                }
 
                     //rise to a higher level
-				    if(flagRise){
+				    /*if(flagRise){
                        flagRise=false;					
-                       arrCheckTile.sort();
-					   console.debug("rise ")
-					   //console.debug("arrCheckTile[0] "+arrCheckTile[0])
-                       /*new_root.childs[0]=arrCurRoot[arrCheckTile[0]];
-					   new_root.childs[1]=arrCurRoot[arrCheckTile[1]];
-					   new_root.childs[2]=arrCurRoot[arrCheckTile[2]];
-					   new_root.childs[3]=arrCurRoot[arrCheckTile[3]];*/
-					   
-					   
-					   for(v=0;v<arrCurRoot.length;v++){
-					        if(v==arrCheckTile[0]||v==arrCheckTile[1]||v==arrCheckTile[2]||v==arrCheckTile[3]){arrCurRoot[v]=0;}//arrCurRoot.splice(v,1);v=-1;}
-							}
-						arrCurRoot.sort();
-						delete arrCurRoot[0];arrCurRoot[0]=null
-                        delete arrCurRoot[1];arrCurRoot[0]=null
-						delete arrCurRoot[2];arrCurRoot[0]=null
-						delete arrCurRoot[3];arrCurRoot[0]=null
-						arrCurRoot.shift();
-						arrCurRoot.shift();
-						arrCurRoot.shift();
-						arrCurRoot.shift();
-						arrCurRoot.unshift(new_root);
+ 
 						delete new_root
 						new_root=null
-                        ;
-                       /*arrloc=new Array();
-					   for(v in arrCurRoot){
-					        if(v==arrCheckTile[0]||v==arrCheckTile[1]||v==arrCheckTile[2]||v==arrCheckTile[3]);
-							else{arrloc.push(arrCurRoot[v]);}
-							}
-					   arrloc.push(new_root);
-					   
-					   arrCurRoot.splice(0,arrCurRoot.length);
-					   for(v in arrloc)arrCurRoot[v]=arrloc[v];
-					   arrloc.splice(0,arrloc.length);*/
-					   
-					   /*arrCurRoot.splice(arrCheckTile[0],1);
-					   arrCurRoot.splice(arrCheckTile[1]-1,1);
-					   arrCurRoot.splice(arrCheckTile[2]-2,1);
-					   arrCurRoot.splice(arrCheckTile[3]-3,1,new_root);*/
-					   //arrCurRoot[arrCurRoot.length]=new_root;
-					   //arrCurRoot.push(new_root);
-				               }
+				               }*/
 								
 						//console.debug("newArrCR.length "+newArrCR.length)		
 
