@@ -3,7 +3,6 @@
  
 require_once("config.php");
 
-$onlygeom=NULL;
 $query;
 
 $_GET["id"]=trim($_GET["id"]);
@@ -28,7 +27,16 @@ $user=mysql_fetch_array($usr);
 
 $verts=explode(" ",trim($user['verts']));
 
-$json_data = array ('id'=>$id,'prnt'=>$user['id_t_p'],'tex'=>$user['OSMtex'],'verts'=> $verts);
+
+$verts_y=array();
+
+ for ($i = 1; $i < count($verts); $i+=3) 
+  { 
+    array_push($verts_y,$verts[$i]);
+  } 
+//'tex'=>$user['OSMtex'],'prnt'=>$user['id_t_p'],
+//echo count($verts)/3;
+$json_data = array ('id'=>$id,'verts'=> $verts_y);
 echo json_encode($json_data);
 
 

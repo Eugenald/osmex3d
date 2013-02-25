@@ -25,9 +25,10 @@ require_once("server_scripts/config.php");
 	</head>
 
 	<body>
-        <div id="cont" ></div>
+        <div  jstcache="0"  id="cont" ></div>
+		<div  jstcache="0"  id="init" ></div>
 
-		<div id="container"></div>
+		<div  jstcache="0"  id="container"></div>
 		
 		<script src="jscripts/three.js"></script>
 
@@ -44,7 +45,8 @@ require_once("server_scripts/config.php");
 function Tile () {
     this.id;
 	this.refcount=-1;
-	this.tex;
+	this.tex_x;
+	this.tex_z;
 	this.lvl;//level
 	this.center;//THREE.Vector3
     this.childs = new Array();//4 id of descendants 
@@ -53,6 +55,7 @@ function Tile () {
     this.childs[2]=-1;
 	this.childs[3]=-1;
     this.prnt;//parent
+	this.texture;
 	this.triangleGeometry = new THREE.Geometry();
 	this.destroy = function () {
          delete this.id;
@@ -62,6 +65,8 @@ function Tile () {
 		 delete this.center;this.center=null;
 		 this.childs.length = 0;delete this.childs;this.childs=null;
 		 delete this.prnt;
+		 //this.triangleGeometry.dispose();
+		 //this.texture.dispose();
 		 delete this.triangleGeometry;this.triangleGeometry=null;
     };
 	
@@ -82,7 +87,6 @@ function TileCache () {
 			//Arrgarbg = new Array();
 			newArrCR=new Array();
 			arrCachePrnt=new Array();
-			var MAXID=0;
 			var timerid=0;
 			cur_root=0;
 			
@@ -98,84 +102,22 @@ function TileCache () {
 
             var div = document.getElementById('cont');
 			//div.style.display="none";
-			div.ongetdata =update_data;	
+			div.ongetdata =update_data;
+
+            var divInit = document.getElementById('init');
+			//div.style.display="none";
+			divInit.ongetdata =onceInit;	
+			
 			init();
 			animate();
 			
-<?php
-//Choose from db 3 levels of detail and fill them
-$query= <<<EOD
-SELECT (SELECT MAX(id) FROM tile) as maxid,tile.id,tile.OSMtex,tile.lvl,ar_verts.verts,tile.id_t_c1,tile.id_t_c2,tile.id_t_c3,tile.id_t_c4,
-tile.id_t_p FROM ar_verts,tile WHERE tile.id=0 and ar_verts.id=tile.id_av
-EOD;
-$usr=mysql_query($query);
-if(!$usr)exit("Ошибка - ".mysql_error());
-while($row = mysql_fetch_array($usr)){ 
-
-$verts=explode(" ",trim($row['verts']));
-$maxid=$row['maxid'];
-$id=$row['id'];
-$tex=$row['OSMtex'];
-$lvl=$row['lvl'];
-$id_t_c1=$row['id_t_c1'];
-$id_t_c2=$row['id_t_c2'];
-$id_t_c3=$row['id_t_c3'];
-$id_t_c4=$row['id_t_c4'];
-$id_t_p=$row['id_t_p'];
-$json_data = array ('id'=>$id,'verts'=> $verts);
-$json_str = json_encode($json_data);
-//<script language='javascript'>
-$js= <<<EOL
-MAXID=$maxid;
-cur_root = new Tile ();
-cur_root.id=$id;
-zxy='$tex'.split(" ");
-cur_root.tex=''+zxy[0]+'/'+zxy[1]+'/'+zxy[2];
-cur_root.lvl=$lvl;
-cur_root.childs[0]=-1;
-cur_root.childs[1]=-1;
-cur_root.childs[2]=-1;
-cur_root.childs[3]=-1;
-cur_root.prnt=$id_t_p;
-var jstr=JSON.parse('$json_str');
-var arr_verts = jstr.verts;
-        for(i=0;i<arr_verts.length;i+=3){
-		cur_root.triangleGeometry.vertices.push(new THREE.Vector3( parseFloat(arr_verts[i]), /*0*/parseFloat(arr_verts[i+1]),parseFloat(arr_verts[i+2])));
-				                        };
-vec1=cur_root.triangleGeometry.vertices[0];
-vec2=cur_root.triangleGeometry.vertices[8];
-vec3=cur_root.triangleGeometry.vertices[72];
-vec4=cur_root.triangleGeometry.vertices[80];
-min1=Math.min(vec4.y,vec3.y);min2=Math.min(vec2.y,vec1.y);min=Math.min(min1,min2);
-max1=Math.max(vec4.y,vec3.y);max2=Math.max(vec2.y,vec1.y);max=Math.max(max1,max2);
-ceny=(min+max)/2.0;
-cenx=(vec2.x+vec1.x)/2.0;
-cenz=(vec2.z+vec3.z)/2.0;
-cur_root.center=new THREE.Vector3(cenx,ceny,cenz);
-EOL;
-print $js;
-}	
-
-?>
-
-initFaceTex(cur_root);
-triangleMaterial = new THREE.MeshBasicMaterial({
-wireframe: true,
-side:THREE.DoubleSide,
- 'overdraw': true
-});
-triangleMesh[cur_root.id] = new THREE.Mesh(cur_root.triangleGeometry, triangleMaterial);
-triangleMesh[cur_root.id].position.set(0.0, 0.0, 0.0);
-scene.add(triangleMesh[cur_root.id]);
-//console.debug("tile N "+i)
-triangleMesh[cur_root.id].visible=true;
-
-arrTile.push(cur_root);
-arrCurRoot.push(cur_root.id);
 //Object ( dynamically add the necessary tiles)
 
-var TLoad = new function (maxiId) {
-    this.maxid=MAXID;
+var TLoad = new function () {
+    this.maxid=-1;
+	this.startX=-1;
+	this.startZ=-1;
+	this.stepGrid=-1;
 	this.idforloadroot=-1;
 	this.ReadyForRoot=true;
     this.indx=0;
@@ -224,6 +166,8 @@ this.loaded = function () {
 }
 
 			function init() {
+			
+			GlobInit();
 			ch=0;
 			    zoom=6;
 				lon=11.76;
@@ -367,6 +311,65 @@ this.loaded = function () {
 			
 			}
 			
+			
+			function onceInit(s) {
+			    
+			  var jstr=JSON.parse(''+s);
+				
+			   if(jstr.id==0){
+				var tileId=jstr.id;
+				TLoad.maxid=parseFloat(jstr.maxid);
+				TLoad.startX=parseFloat(jstr.start_xz[0]);
+				TLoad.startZ=parseFloat(jstr.start_xz[1]);
+				arrTile[tileId]=new Tile();
+				arrTile[tileId].id=jstr.id;
+				arrTile[tileId].lvl=0;
+				arrTile[tileId].prnt=-1;
+				arrTile[tileId].tex_x=0;
+				arrTile[tileId].tex_z=0;
+					
+				console.debug("Init done crt Root Tile  "+jstr.id+" ");
+				//determine a width and a height of cell
+				TLoad.stepGrid=(Math.abs(TLoad.startX)*2)/8;
+                var scale=TLoad.stepGrid;
+				var offset=0  // no offset for 0st lvl 
+				//count 1st coordinates for 1st tile
+				var startX=TLoad.startX;
+				var startZ=TLoad.startZ;
+				var x_=-1;
+				var z_=-1;
+				var index_=0;
+				//Creation of a grid
+                    for(var i_=0;i_<9;i_++){
+					    z_=startZ+(scale)*i_;
+					   for(var j_=0;j_<9;j_++){
+					      x_=startX+(scale)*j_;
+		                  arrTile[tileId].triangleGeometry.vertices.push(new THREE.Vector3( x_,parseFloat(jstr.verts[index_]),z_));
+				          console.debug("index "+index_+" x "+x_+" jstr.verts[index] "+jstr.verts[index_]+" z "+z_);
+						  index_++;
+						             }
+									 j_=0;
+											};
+				initFaceTex(arrTile[tileId]);							
+                vec1=arrTile[tileId].triangleGeometry.vertices[0];
+                vec2=arrTile[tileId].triangleGeometry.vertices[8];
+                vec3=arrTile[tileId].triangleGeometry.vertices[72];
+                vec4=arrTile[tileId].triangleGeometry.vertices[80];
+                min1=Math.min(vec4.y,vec3.y);min2=Math.min(vec2.y,vec1.y);min=Math.min(min1,min2);
+                max1=Math.max(vec4.y,vec3.y);max2=Math.max(vec2.y,vec1.y);max=Math.max(max1,max2);
+                ceny=(min+max)/2.0;
+                cenx=(vec2.x+vec1.x)/2.0;
+                cenz=(vec2.z+vec3.z)/2.0;
+                arrTile[tileId].center=new THREE.Vector3(cenx,ceny,cenz);
+				crtMesh(jstr.id);
+                arrCurRoot.unshift(tileId);
+                jstr=null;					
+					  
+                            }
+				                      }
+									  
+			
+			
 			//function is called in response to a request from the server to get the tile by id
 			function update_data(s) {
 			//clearInterval(timerid);
@@ -374,76 +377,47 @@ this.loaded = function () {
             //alert(s);
 			    //str_vert=s.trim();//!!! убери в  генераторе в конце пробел
 			    //var arr_verts = str_vert.split(/\s+/);
-				tile = new Tile ();
-				flagroot=false;
+				 tileId=-1;
+				var flagroot=false;
+				var jstr;
 				jstr=JSON.parse(''+s);
 				//console.debug("cur_root.id  "+cur_root.id)
 				
 				//if(TLoad.idforloadroot==jstr.id)flagroot=true;
                  findtile=false;
 				 for(j in arrCurRoot){
-				    cur_ID=arrCurRoot[j];
+				     cur_ID=arrCurRoot[j];
 					//if(flagroot){
 					   //if(cur_ID==jstr.id){console.debug("create tile  "+jstr.id+" "+arrTile[cur_ID]);tile=arrTile[cur_ID];flagroot=true;break;}
 					          //  }
 					//else{			
-                       if(cur_ID*4+1==jstr.id){arrTile[cur_ID*4+1]=new Tile();tile=arrTile[cur_ID*4+1];tile.id=jstr.id;arrTile[cur_ID].childs[0]=jstr.id;console.debug("arrTile["+cur_ID+"].childs[0] "+jstr.id);tile.lvl=arrTile[cur_ID].lvl+1;findtile=true;break;}
-					   if(cur_ID*4+2==jstr.id){arrTile[cur_ID*4+2]=new Tile();tile=arrTile[cur_ID*4+2];tile.id=jstr.id;arrTile[cur_ID].childs[1]=jstr.id;console.debug("arrTile["+cur_ID+"].childs[1] "+jstr.id);tile.lvl=arrTile[cur_ID].lvl+1;findtile=true;break;}
-					   if(cur_ID*4+3==jstr.id){arrTile[cur_ID*4+3]=new Tile();tile=arrTile[cur_ID*4+3];tile.id=jstr.id;arrTile[cur_ID].childs[2]=jstr.id;console.debug("arrTile["+cur_ID+"].childs[2] "+jstr.id);tile.lvl=arrTile[cur_ID].lvl+1;findtile=true;break;}
-					   if(cur_ID*4+4==jstr.id){arrTile[cur_ID*4+4]=new Tile();tile=arrTile[cur_ID*4+4];tile.id=jstr.id;arrTile[cur_ID].childs[3]=jstr.id;console.debug("arrTile["+cur_ID+"].childs[3] "+jstr.id);tile.lvl=arrTile[cur_ID].lvl+1;findtile=true;break;}
+                       if(cur_ID*4+1==jstr.id){tileId=cur_ID*4+1;arrTile[tileId]=new Tile();arrTile[tileId].id=jstr.id;arrTile[tileId].tex_x=2*arrTile[cur_ID].tex_x;arrTile[tileId].tex_z=2*arrTile[cur_ID].tex_z;arrTile[cur_ID].childs[0]=jstr.id;console.debug("tex x  "+arrTile[tileId].tex_x+" y "+arrTile[tileId].tex_z);arrTile[tileId].lvl=arrTile[cur_ID].lvl+1;findtile=true;break;}
+					   if(cur_ID*4+2==jstr.id){tileId=cur_ID*4+2;arrTile[tileId]=new Tile();arrTile[tileId].id=jstr.id;arrTile[tileId].tex_x=2*arrTile[cur_ID].tex_x+1;arrTile[tileId].tex_z=2*arrTile[cur_ID].tex_z;arrTile[cur_ID].childs[1]=jstr.id;console.debug("tex x  "+arrTile[tileId].tex_x+" y "+arrTile[tileId].tex_z);arrTile[tileId].lvl=arrTile[cur_ID].lvl+1;findtile=true;break;}
+					   if(cur_ID*4+3==jstr.id){tileId=cur_ID*4+3;arrTile[tileId]=new Tile();arrTile[tileId].id=jstr.id;arrTile[tileId].tex_x=2*arrTile[cur_ID].tex_x;arrTile[tileId].tex_z=2*arrTile[cur_ID].tex_z+1;arrTile[cur_ID].childs[2]=jstr.id;console.debug("tex x  "+arrTile[tileId].tex_x+" y "+arrTile[tileId].tex_z);arrTile[tileId].lvl=arrTile[cur_ID].lvl+1;findtile=true;break;}
+					   if(cur_ID*4+4==jstr.id){tileId=cur_ID*4+4;arrTile[tileId]=new Tile();arrTile[tileId].id=jstr.id;arrTile[tileId].tex_x=2*arrTile[cur_ID].tex_x+1;arrTile[tileId].tex_z=2*arrTile[cur_ID].tex_z+1;arrTile[cur_ID].childs[3]=jstr.id;console.debug("tex x  "+arrTile[tileId].tex_x+" y "+arrTile[tileId].tex_z);arrTile[tileId].lvl=arrTile[cur_ID].lvl+1;findtile=true;break;}
 					   // }
-					 delete cur_ID;
+					 //delete cur_ID;
                      //console.debug("del cur "+r);
                      cur_ID=null					 
 					}
-					
+				 //console.debug("!findtile "+(!findtile)+" id "+jstr.id+" triangleMesh[(jstr.id*4+1)] "+triangleMesh[(jstr.id*4+1)]);	
 				if(!findtile&&triangleMesh[(jstr.id*4+1)]&&triangleMesh[(jstr.id*4+2)]&&triangleMesh[(jstr.id*4+3)]&&triangleMesh[(jstr.id*4+4)]/*&&arrTile[jstr.id]*/){
 				/*console.debug("create tile  "+jstr.id+" "+arrTile[jstr.id]);*/
-				arrTile[jstr.id]=new Tile();
-				tile=arrTile[jstr.id];
-				tile.id=jstr.id;
-				lvl=-1;
-				for(t=0;t<=MAXID;t=(t*4+4)){lvl++;if(jstr.id<=t)break}
-				tile.lvl=lvl
-				flagroot=true;}	
-                
-				zxy=jstr.tex.split(" ");
-                tile.tex=''+zxy[0]+'/'+zxy[1]+'/'+zxy[2];
-				tile.prnt=jstr.prnt;
-				/*tile.childs[0]=new Tile();
-				tile.childs[1]=new Tile();
-				tile.childs[2]=new Tile();
-				tile.childs[3]=new Tile();*/
-                //tile.prnt=cur_tile.id;
-
-                var arr_verts = jstr.verts;
-                    for(i=0;i<arr_verts.length;i+=3){
-		               tile.triangleGeometry.vertices.push(new THREE.Vector3( parseFloat(arr_verts[i]), /*0*/parseFloat(arr_verts[i+1]),parseFloat(arr_verts[i+2])));
-				                            };
-				initFaceTex(tile);							
-                vec1=tile.triangleGeometry.vertices[0];
-                vec2=tile.triangleGeometry.vertices[8];
-                vec3=tile.triangleGeometry.vertices[72];
-                vec4=tile.triangleGeometry.vertices[80];
-                min1=Math.min(vec4.y,vec3.y);min2=Math.min(vec2.y,vec1.y);min=Math.min(min1,min2);
-                max1=Math.max(vec4.y,vec3.y);max2=Math.max(vec2.y,vec1.y);max=Math.max(max1,max2);
-                ceny=(min+max)/2.0;
-                cenx=(vec2.x+vec1.x)/2.0;
-                cenz=(vec2.z+vec3.z)/2.0;
-                tile.center=new THREE.Vector3(cenx,ceny,cenz);
+				tileId=jstr.id;
+				arrTile[tileId]=new Tile();
+				arrTile[tileId].id=jstr.id;
+				var lvl=-1;
+				for(t=0;t<=TLoad.maxid;t=(t*4+4)){lvl++;if(jstr.id<=t)break}
+				arrTile[tileId].lvl=lvl
+				flagroot=true;}
 				
 				if(flagroot){
-				    triangleMaterial = new THREE.MeshBasicMaterial({
-					//'map': texture,
-					wireframe: true,
-					side:THREE.DoubleSide,
-                    'overdraw': true
-				                       });				
-
-                 	triangleMesh[jstr.id] = new THREE.Mesh(tile.triangleGeometry, triangleMaterial);
-				    triangleMesh[jstr.id].position.set(0.0, 0.0, 0.0);
-					scene.add(triangleMesh[jstr.id]);
-					triangleMesh[jstr.id].visible=true;
+				
+				    arrTile[tileId].tex_x=arrTile[(tileId*4+1)].tex_x/2;
+					arrTile[tileId].tex_z=arrTile[(tileId*4+1)].tex_z/2;
+					//console.debug("tex x  "+arrTile[tileId].tex_x+" y "+arrTile[tileId].tex_y);
+					crtMesh(jstr.id);
+					
 					console.debug("crt  "+jstr.id+" ");
 					console.debug("del  "+(jstr.id*4+1)+" ");
 					console.debug("del  "+(jstr.id*4+2)+" ");
@@ -458,14 +432,76 @@ this.loaded = function () {
 					deltile((jstr.id*4+3));
 					deltile((jstr.id*4+4));
 					
-					arrCurRoot.unshift(tile.id);
+					arrCurRoot.unshift(tileId);
 					TLoad.idforloadroot=-1;
 		            TLoad.ReadyForRoot=true;
-					TLoad.arTileForAdd.splice(0,TLoad.arTileForAdd.length);//=new Array();
+					
+					TLoad.arTileForAdd.splice(0,TLoad.arTileForAdd.length);
 					TLoad.indx=0;
                             }
-					 r=(delete tile);
-                     console.debug("del  "+r);				 
+								
+                if(tileId>=0){
+
+				/*var lvl=-1;
+				var frstIdlvl=0;
+				var countIdlvl;
+				for(var t=0;t<=MAXID;t=(t*4+4)){lvl++;if(jstr.id<=t)break;frstIdlvl=t+1;}
+				arrTile[tileId].lvl=lvl;
+                countIdlvl=Math.pow(4,lvl);
+				console.debug("countIdlvl "+countIdlvl+" frstIdlvl "+frstIdlvl)
+				
+				var col=(tileId-frstIdlvl)%Math.sqrt(countIdlvl);
+				var row=parseInt((tileId-frstIdlvl)/Math.sqrt(countIdlvl));
+				console.debug("id "+tileId+" col "+col+" row "+row)*/
+				//zxy=jstr.tex.split(" ");
+                //tile.tex=''+zxy[0]+'/'+zxy[1]+'/'+zxy[2];
+				arrTile[tileId].prnt=jstr.id==0?-1:((jstr.id-1)-((jstr.id-1)%4))/4;
+
+				var var1=Math.pow(2,arrTile[tileId].lvl);//number of tiles in row (specific lvl) 
+				scale=jstr.id==0?TLoad.stepGrid:TLoad.stepGrid/(var1);//determine a width and a height of cell
+				//console.debug("scale "+scale+" tile.id "+arrTile[tileId].id+" tile.lvl "+arrTile[tileId].lvl)
+				var offset=jstr.id==0?0:Math.abs(2*TLoad.startX)/(var1);  // determine an offset for 1st tile of specific lvl 
+				//count 1st coordinates for concrete tile
+				var startX=TLoad.startX+offset*arrTile[tileId].tex_x;
+				var startZ=TLoad.startZ+offset*arrTile[tileId].tex_z;
+				console.debug("tileId "+tileId)
+				console.debug("startX "+startX)
+				console.debug("startZ "+startZ)
+				var x_=-1;
+				var z_=-1;
+				var index_=0;
+				var i_=0;
+				var j_=0;
+				//Creation of a grid
+                    for(;i_<9;i_++){
+					    z_=startZ+(scale)*i_;
+					   for(;j_<9;j_++){
+					      x_=startX+(scale)*j_;
+		                  arrTile[tileId].triangleGeometry.vertices.push(new THREE.Vector3( x_,parseFloat(jstr.verts[index_]),z_));
+				          //console.debug("index "+index_+" x "+x_+" jstr.verts[index] "+jstr.verts[index_]+" z "+z_);
+						  index_++;
+						             }
+									 j_=0;
+											};
+				initFaceTex(arrTile[tileId]);							
+                vec1=arrTile[tileId].triangleGeometry.vertices[0];
+                vec2=arrTile[tileId].triangleGeometry.vertices[8];
+                vec3=arrTile[tileId].triangleGeometry.vertices[72];
+                vec4=arrTile[tileId].triangleGeometry.vertices[80];
+                min1=Math.min(vec4.y,vec3.y);min2=Math.min(vec2.y,vec1.y);min=Math.min(min1,min2);
+                max1=Math.max(vec4.y,vec3.y);max2=Math.max(vec2.y,vec1.y);max=Math.max(max1,max2);
+                ceny=(min+max)/2.0;
+                cenx=(vec2.x+vec1.x)/2.0;
+                cenz=(vec2.z+vec3.z)/2.0;
+                arrTile[tileId].center=new THREE.Vector3(cenx,ceny,cenz);
+				//var tex=''+arrTile[id].lvl+'/'+arrTile[id].tex_x+'/'+arrTile[id].tex_y;
+                //arrTile[tileId].texture=THREE.ImageUtils.loadTexture('http://c.tile.openstreetmap.org/'+tex+".png");
+				}
+				
+
+					 //r=(delete tile);
+                    // console.debug("del  "+r);
+                      jstr=null;					
 					  TLoad.loaded()
 //console.debug("load id  "+TLoad.loaded())	
 				                      }
@@ -476,8 +512,6 @@ this.loaded = function () {
 				camera.updateProjectionMatrix();
 
 				renderer.setSize( window.innerWidth, window.innerHeight );
-
-				controls.handleResize();
 
 				render();
 
@@ -501,8 +535,6 @@ this.loaded = function () {
 			    //console.debug("dist for id "+tile)
 			    cam_pos=cam.position
 				ax=Math.max(cam_pos.x,arrTile[tile].center.x)-Math.min(cam_pos.x,arrTile[tile].center.x);
-				//console.debug("cam.x "+cam.x+"tiles["+(id)+"].center.x "+tiles[id].center.x)
-				//console.debug("ax "+ax)
 				ay=Math.max(cam_pos.y,arrTile[tile].center.y)-Math.min(cam_pos.y,arrTile[tile].center.y);
 				az=Math.max(cam_pos.z,arrTile[tile].center.z)-Math.min(cam_pos.z,arrTile[tile].center.z);
 				cD=Math.sqrt(ax*ax+ay*ay+az*az);
@@ -516,7 +548,12 @@ this.loaded = function () {
 				if(req==false)req=false;
 				else{req=true;}
 			    scene.remove(triangleMesh[id]);
+				/*triangleMesh[id].geometry.deallocate();
+				triangleMesh[id].material.deallocate();
+				triangleMesh[id].deallocate();*/
+
 			    renderer.deallocateObject(triangleMesh[id]);
+				//renderer.deallocateTexture(arrTile[id].texture);
 				r=delete triangleMesh[id];
 				triangleMesh[id]=null
 				if(req){
@@ -526,7 +563,7 @@ this.loaded = function () {
 				  if(triangleMesh[(id*4+4)])deltilemesh((id*4+4));
 				}
 				//triangleMesh.splice(id,1);
-				console.debug("del "+triangleMesh[id]+" id "+id+" "+r)
+				//console.debug("del "+triangleMesh[id]+" id "+id+" "+r)
 			}
 
             function deltile(id,req){
@@ -544,16 +581,32 @@ this.loaded = function () {
 				console.debug("Delete "+arrTile[id]+" id "+id)
 			}
 			
+			function crtMesh(id){
+			    var tex=''+arrTile[id].lvl+'/'+arrTile[id].tex_x+'/'+arrTile[id].tex_z;
+                var texture=THREE.ImageUtils.loadTexture('http://c.tile.openstreetmap.org/'+tex+".png",new THREE.UVMapping(),function(){triangleMesh[id].visible=true;renderer.render( scene, camera );})
+		        var triangleMaterial = new THREE.MeshBasicMaterial({
+				'map':texture,
+				//'map': arrTile[id].texture,
+				//wireframe: true,
+				side:THREE.DoubleSide,
+                'overdraw': true
+				                });				
+
+                triangleMesh[id] = new THREE.Mesh(arrTile[id].triangleGeometry, triangleMaterial);
+				triangleMesh[id].position.set(0.0, 0.0, 0.0);
+				scene.add(triangleMesh[id]);
+				triangleMesh[id].visible=true;
+				
+				//console.debug("Crt "+triangleMesh[id]+" id "+id)
+
+			}
+			
 			function render() {
 				//wrt("cur_t_ids.length "+cur_t_ids.length+" ")//div.innerHTML+="cur_t_ids.length "+cur_t_ids.length+" "
 				console.debug(" ")
 				console.debug(" ")
 				//console.debug("tiles.length "+tiles.length)	
-//
-				new_root=0;
-				flagRise=false;
-				arrCheckTile = new Array();
-				//newArrCR=new Array();
+
 				console.debug("arrCurRoot.length "+arrCurRoot.length)	
 				//&&TLoad.idforloadroot!=arrCurRoot[j]&&TLoad.ReadyForRoot
 				for(j=0;j<arrCurRoot.length;j++){
@@ -596,72 +649,22 @@ this.loaded = function () {
 				    
 					deltilemesh(cur_ID,false)
 					deltile(cur_ID,false)
-					
 
-                     //texture=THREE.ImageUtils.loadTexture('http://c.tile.openstreetmap.org/'+tile.tex+".png")
-		              triangleMaterial = new THREE.MeshBasicMaterial({
-					    //'map': texture,
-						wireframe: true,
-						side:THREE.DoubleSide,
-                        'overdraw': true
-				                       });				
+                    crtMesh((cur_ID*4+1));
+                    crtMesh((cur_ID*4+2));
+                    crtMesh((cur_ID*4+3));					
+                    crtMesh((cur_ID*4+4));
 
-                 	  triangleMesh[(cur_ID*4+1)] = new THREE.Mesh(arrTile[(cur_ID*4+1)].triangleGeometry, triangleMaterial);
-				      triangleMesh[(cur_ID*4+1)].position.set(0.0, 0.0, 0.0);
-					  scene.add(triangleMesh[(cur_ID*4+1)]);
-					  triangleMesh[(cur_ID*4+1)].visible=true;
-					  
-					  
-					  //texture=THREE.ImageUtils.loadTexture('http://c.tile.openstreetmap.org/'+tile.tex+".png")
-		              triangleMaterial = new THREE.MeshBasicMaterial({
-					    //'map': texture,
-						wireframe: true,
-						side:THREE.DoubleSide,
-                        'overdraw': true
-				                       });				
-
-                 	  triangleMesh[(cur_ID*4+2)] = new THREE.Mesh(arrTile[(cur_ID*4+2)].triangleGeometry, triangleMaterial);
-				      triangleMesh[(cur_ID*4+2)].position.set(0.0, 0.0, 0.0);
-					  scene.add(triangleMesh[(cur_ID*4+2)]);
-					  triangleMesh[(cur_ID*4+2)].visible=true;
-					  
-					  
-					  //texture=THREE.ImageUtils.loadTexture('http://c.tile.openstreetmap.org/'+tile.tex+".png")
-		              triangleMaterial = new THREE.MeshBasicMaterial({
-					    //'map': texture,
-						wireframe: true,
-						side:THREE.DoubleSide,
-                        'overdraw': true
-				                       });				
-
-                 	  triangleMesh[(cur_ID*4+3)] = new THREE.Mesh(arrTile[(cur_ID*4+3)].triangleGeometry, triangleMaterial);
-				      triangleMesh[(cur_ID*4+3)].position.set(0.0, 0.0, 0.0);
-					  scene.add(triangleMesh[(cur_ID*4+3)]);
-					  triangleMesh[(cur_ID*4+3)].visible=true;
-					  
-					  
-					  //texture=THREE.ImageUtils.loadTexture('http://c.tile.openstreetmap.org/'+tile.tex+".png")
-		              triangleMaterial = new THREE.MeshBasicMaterial({
-					    //'map': texture,
-						wireframe: true,
-						side:THREE.DoubleSide,
-                        'overdraw': true
-				                       });				
-
-                 	  triangleMesh[(cur_ID*4+4)] = new THREE.Mesh(arrTile[(cur_ID*4+4)].triangleGeometry, triangleMaterial);
-				      triangleMesh[(cur_ID*4+4)].position.set(0.0, 0.0, 0.0);
-					  scene.add(triangleMesh[(cur_ID*4+4)]);
-					  triangleMesh[(cur_ID*4+4)].visible=true;
-					  
-					 //console.debug("tileDrop "+tileDrop.id)
-					// console.debug("ch_id4 "+ch_id4.id)
-					del_indx=arrCurRoot.indexOf(cur_ID);
+					del_indx=j;
 					console.debug("DEL "+del_indx)
-					if(del_indx>=0){arrCurRoot.splice(del_indx,1);arrCurRoot.push((cur_ID*4+1));arrCurRoot.push((cur_ID*4+2));arrCurRoot.push((cur_ID*4+3));arrCurRoot.push((cur_ID*4+4));}
+					
+					arrCurRoot.splice(del_indx,1);
+					arrCurRoot.push((cur_ID*4+1));
+					arrCurRoot.push((cur_ID*4+2));
+					arrCurRoot.push((cur_ID*4+3));
+					arrCurRoot.push((cur_ID*4+4));
 						
-					console.debug("break ")
-					//r=delete cur_root
-					//cur_root=null
+					//console.debug("break ")
 					break;			
                                 }
 				    
@@ -672,27 +675,21 @@ this.loaded = function () {
 				 //does tile have а parent
 				 if(TLoad.ReadyForRoot&&arrTile[cur_ID].prnt>=0){
 				    //console.debug("(arrTile[cur_ID].lvl-1) "+(arrTile[cur_ID].lvl-1))
-				    prntId=arrTile[cur_ID].prnt;
+				    prntId=(1*arrTile[cur_ID].prnt);
 					ch_id1=4*prntId+1;
 					ch_id2=4*prntId+2;
 					ch_id3=4*prntId+3;
 					ch_id4=4*prntId+4;
 					allchexist=true;
-					console.debug(ch_id1+"  arrTile[ch_id1] "+arrTile[ch_id1])
+					/*console.debug(ch_id1+"  arrTile[ch_id1] "+arrTile[ch_id1])
 					console.debug(ch_id2+"  arrTile[ch_id2] "+arrTile[ch_id2])
 					console.debug(ch_id3+"  arrTile[ch_id3] "+arrTile[ch_id3])
-					console.debug(ch_id4+"  arrTile[ch_id4] "+arrTile[ch_id4])
+					console.debug(ch_id4+"  arrTile[ch_id4] "+arrTile[ch_id4])*/
 					if(!arrTile[ch_id1]){allchexist=false;}
 					if(!arrTile[ch_id2]){allchexist=false;}
 					if(!arrTile[ch_id3]){allchexist=false;}
 					if(!arrTile[ch_id4]){allchexist=false;}
-					if(allchexist){
-                      console.debug("allchexist "+allchexist)					
-				     /*ch_id1=arrCheckTile[0];console.debug("ch_id1.id "+ch_id1.id)
-					 ch_id2=arrCheckTile[1];console.debug("ch_id2.id "+ch_id2.id)
-					 ch_id3=arrCheckTile[2];console.debug("ch_id3.id "+ch_id3.id)
-					 ch_id4=arrCheckTile[3];console.debug("ch_id4.id "+ch_id4.id)*/
-					 
+					if(allchexist){				
 
 					//constant distance of the tileparent by level
 					lvlconst=(arrTile[cur_ID].lvl-1)*3.0;if(lvlconst<=0)lvlconst=0
@@ -701,23 +698,20 @@ this.loaded = function () {
 					//distance to all tiles is bigger than constant to parent
 				 	if(getDistance(camera,ch_id1)>activatedDistPrnt&&getDistance(camera,ch_id2)>activatedDistPrnt&&getDistance(camera,ch_id3)>activatedDistPrnt&&getDistance(camera,ch_id4)>activatedDistPrnt){
 					flagRise=true;
-					console.debug("verify rising ")
 					count=0;
 					for(i=0 ;i< arrCurRoot.length;i++){
-					     if(arrTile[arrCurRoot[i]].prnt==prntId){console.debug("now we will have deleted "+arrCurRoot[i]);arrCurRoot[i]=0;count++;}
+					     if(arrTile[arrCurRoot[i]].prnt==prntId){arrCurRoot[i]=0;count++;}
 				        }
 					arrCurRoot.sort();	
 					for(i=0 ;i<count;i++)arrCurRoot.shift();	
 					//arrCurRoot.unshift(new_root.id);
-					new_root=new Tile();
-					new_root.id=prntId;
-					//new_root.lvl=arrTile[cur_ID].lvl-1;
-					//arrTile[new_root.id]=new_root;
-					TLoad.prepareRootID(new_root.id);
-					console.debug("New id "+new_root.id)
+					
+					/*TLoad.arTileForAdd.splice(0,TLoad.arTileForAdd.length);
+					TLoad.indx=0;*/
+					
+					TLoad.prepareRootID(prntId);
+					console.debug("New id "+prntId)
                     console.debug("arrCurRoot.length "+arrCurRoot.length)
-					/*delete cur_root
-					cur_root=null*/
 					break;
 					}
 
@@ -726,75 +720,13 @@ this.loaded = function () {
 						
 				                      }		
 							
-
-							
-					///*r=*/delete cur_root
-					//cur_root=null
-                    //console.debug("del  "+r);					
-				                }
-
-                    //rise to a higher level
-				    /*if(flagRise){
-                       flagRise=false;					
- 
-						delete new_root
-						new_root=null
-				               }*/
-								
-						//console.debug("newArrCR.length "+newArrCR.length)		
-
-						
-						//for(y=0;y<Arrgarbg.length;y++)console.debug("Arrgarbg[y].id "+Arrgarbg[y].id)
-						
-						
-//--------------------------Invoke the Garbage Colection for unactive tiles-------------------------------//
-/*						if(j==arrCurRoot.length&&Arrgarbg.length>0){
-						    console.debug("invoke the Garbage Colection for unactive tiles ")
-								   arLoclGrbg=new Array()
-								   newArrCR=new Array()	
-								   y=0	
-                            //console.debug("Arrgarbg.length "+Arrgarbg.length)								   
-						     for(;y<Arrgarbg.length;y++){
-						         prnt=-1;
-								 
-								 if(Arrgarbg[y].prnt>=0)prnt=Arrgarbg[y].prnt;
-								 else{Arrgarbg=new Array();break}
-								 //console.debug("Arrgarbg.length "+Arrgarbg.length)
-								 y++
-								 while(y<Arrgarbg.length){
-								    //console.debug("prnt "+prnt)
-									console.debug("y "+y)
-									console.debug("Arrgarbg[y].prnt "+Arrgarbg[y].prnt)
-								    if(Arrgarbg[y].prnt==prnt){y++}
-								    else{break;}				
-								   }
-								 y-- 
-								 for(i in arrCurRoot){
-					               if(arrCurRoot[i].prnt==prnt){//console.debug("triangleMesh[arrCurRoot[i].childs[0].id] "+triangleMesh[arrCurRoot[i].childs[0].id])
-									 if(!triangleMesh[arrCurRoot[i].childs[0].id])arLoclGrbg.push(arrCurRoot[i].id);
-										       
-											   //deltilemesh(arrCurRoot[i].id)
-											   //console.debug("arLoclGrbg.id "+arrCurRoot[i].id)                     
-																  }
-						                            }
-											}
-                                 //console.debug("arLoclGrbg.length "+arLoclGrbg.length)												
-								 if(arLoclGrbg.length>0){
-								     for(c=0;c<arrCurRoot.length;c++){skip=false;//console.debug("arLoclGrbg.id "+arLoclGrbg[g])
-								         for(g=0;g<arLoclGrbg.length;g++){if(arrCurRoot[c].id==arLoclGrbg[g])skip=true;}
-										 if(!skip)newArrCR.push(arrCurRoot[c]);
-										 }
-								     }
-								 if(newArrCR.length>0)arrCurRoot=newArrCR;
-				            Arrgarbg=new Array();        
-						  }
-*/						
-                        						
-                //timerid++;if(timerid==70){timerid=0;}		
+                                       }
+					
 				if(TLoad)TLoad.loadTile();
 				renderer.render( scene, camera );
 				stats.update();
 
+			
 			}
 
 			
