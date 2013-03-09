@@ -25,17 +25,17 @@ $usr=mysql_query($query);
 if(!$usr)exit("Ошибка - ".mysql_error());	
 $user=mysql_fetch_array($usr);
 
-$verts=explode(" ",trim($user['verts']));
-
-
 $verts_y=array();
+
+if(isset($user['verts'])){
+$verts=explode(" ",trim($user['verts']));
 
  for ($i = 1; $i < count($verts); $i+=3) 
   { 
     array_push($verts_y,$verts[$i]);
   } 
-//'tex'=>$user['OSMtex'],'prnt'=>$user['id_t_p'],
-//echo count($verts)/3;
+                          }
+else{$id*=-1;}						  
 $json_data = array ('id'=>$id,'verts'=> $verts_y);
 echo json_encode($json_data);
 

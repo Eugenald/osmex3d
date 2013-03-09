@@ -26,7 +26,6 @@ require_once("server_scripts/config.php");
 
 	<body>
         <div  jstcache="0"  id="cont" ></div>
-		<div  jstcache="0"  id="init" ></div>
 
 		<div  jstcache="0"  id="container"></div>
 		
@@ -48,7 +47,6 @@ function Tile () {
 	this.tex_x;
 	this.tex_z;
 	this.lvl;//level
-	this.center;//THREE.Vector3
     this.childs = new Array();//4 id of descendants 
     this.childs[0]=-1;
     this.childs[1]=-1;
@@ -62,7 +60,6 @@ function Tile () {
 		 delete this.refcount;
 		 delete this.tex;
 		 delete this.lvl;
-		 delete this.center;this.center=null;
 		 this.childs.length = 0;delete this.childs;this.childs=null;
 		 delete this.prnt;
 		 //this.triangleGeometry.dispose();
@@ -72,23 +69,16 @@ function Tile () {
 	
 }
 
-//Class of cache tileprnt		
-function TileCache () {
-    this.tile=-1;
-	this.refcounter=0;
-}
 
 			if ( ! Detector.webgl ) Detector.addGetWebGLMessage();
 
 			var container, stats;
 			
-			arrCurRoot = new Array();
-			arrTile = new Array();
-			//Arrgarbg = new Array();
-			newArrCR=new Array();
-			arrCachePrnt=new Array();
+			var arrCurRoot = new Array();
+			var arrTile = new Array();
+
 			var timerid=0;
-			cur_root=0;
+			var Exist1stTl=false;
 			
 			var camera, controls, scene, renderer;
 			
@@ -96,17 +86,11 @@ function TileCache () {
 
 			var cross;
 			
-			triangleGeometry=0;
-			
-			triangleMesh = new Array();
+			var triangleMesh = new Array();
 
             var div = document.getElementById('cont');
 			//div.style.display="none";
-			div.ongetdata =update_data;
-
-            var divInit = document.getElementById('init');
-			//div.style.display="none";
-			divInit.ongetdata =onceInit;	
+			div.ongetdata =responseServer;	
 			
 			init();
 			animate();
@@ -114,9 +98,10 @@ function TileCache () {
 //Object ( dynamically add the necessary tiles)
 
 var TLoad = new function () {
-    this.maxid=-1;
-	this.startX=-1;
-	this.startZ=-1;
+    this.maxid=999999999;
+	//set 1st coordinates for 1st tileRoots
+	this.startX=-20;
+	this.startZ=-20;
 	this.stepGrid=-1;
 	this.idforloadroot=-1;
 	this.ReadyForRoot=true;
@@ -167,18 +152,10 @@ this.loaded = function () {
 
 			function init() {
 			
-			GlobInit();
-			ch=0;
-			    zoom=6;
-				lon=11.76;
-				lat=41.97;
-			    x_t=lon2tile(lon,zoom);
-				y_t=lat2tile(lat,zoom);
-			    //var texture=THREE.ImageUtils.loadTexture('http://c.tile.openstreetmap.org/'+zoom+'/'+x_t+'/'+y_t+'.png');
-                //var texture=THREE.ImageUtils.loadTexture('http://c.tile.openstreetmap.org/'+tiles[0].tex+".png");
-				//alert('http://c.tile.openstreetmap.org/'+tiles[0].tex+".png")
+			    land_func(0);// load 1st tileroots
+
 				camera = new THREE.PerspectiveCamera( 45, window.innerWidth / window.innerHeight, 0.01, 100 );
-				camera.position.set(0, 27.0, 21.0);
+				camera.position.set(0, 27.0, 35.0);
 				
 				
                 controls = new THREE.CameraController( camera );
@@ -186,47 +163,13 @@ this.loaded = function () {
 
 				//controls.rotateSpeed = 0.01;
 
-				controls.addEventListener( 'change', render );
+				controls.addEventListener( 'change', checkTiles );
                 //timerid=setInterval(render, 24);
 				
 				//scene
                 scene = new THREE.Scene();
 				scene.fog = new THREE.FogExp2( 0xcccccc, 0.002 );
-				//var material =  new THREE.MeshLambertMaterial( { color:0xffffff, shading: THREE.FlatShading } );
 
-
-
-				/*triangleGeometry.faces[0].vertexColors[0] = new THREE.Color(0xFF0000);
-				triangleGeometry.faces[0].vertexColors[1] = new THREE.Color(0x00FF00);
-				triangleGeometry.faces[0].vertexColors[2] = new THREE.Color(0x0000FF);*/
-
-				// Create a mesh and insert the geometry and the material. Translate the whole mesh
-				// by -1.5 on the x axis and by 4 on the z axis. Finally add the mesh to the scene.
-				/*triangleMesh[0] = new THREE.Mesh(tiles[0].triangleGeometry, triangleMaterial);
-				triangleMesh[0].position.set(0.0, 0.0, 0.0);
-				scene.add(triangleMesh[0]);*/
-				
-				//fill the meshes of our tiles and add to the scene
-		/*for ( i = 0; i <tiles.length;i++) {
-		              texture=THREE.ImageUtils.loadTexture('http://c.tile.openstreetmap.org/'+tiles[i].tex+".png")
-					  //texture=THREE.ImageUtils.loadTexture('http://otile1.mqcdn.com/tiles/1.0.0/osm/'+tiles[i].tex+".png")
-		              triangleMaterial = new THREE.MeshBasicMaterial({
-					    'map': texture,
-						//wireframe: true,
-						side:THREE.DoubleSide,
-                        'overdraw': true
-				                       });
-                 	  triangleMesh[i] = new THREE.Mesh(tiles[i].triangleGeometry, triangleMaterial);
-				      triangleMesh[i].position.set(0.0, 0.0, 0.0);
-					  scene.add(triangleMesh[i]);
-					  triangleMesh[i].visible=false;
-					  //console.debug("tile N "+i)
-
-			}
-				triangleMesh[0].visible=true;*/
-
-				//triangleMaterial.wireframe=true;
-				//triangleMaterial.color=new THREE.Color(0x2ed149);
 				
 				// lights
 
@@ -310,97 +253,29 @@ this.loaded = function () {
 	                	                   }			
 			
 			}
-			
-			
-			function onceInit(s) {
-			    
-			  var jstr=JSON.parse(''+s);
-				
-			   if(jstr.id==0){
-				var tileId=jstr.id;
-				TLoad.maxid=parseFloat(jstr.maxid);
-				TLoad.startX=parseFloat(jstr.start_xz[0]);
-				TLoad.startZ=parseFloat(jstr.start_xz[1]);
-				arrTile[tileId]=new Tile();
-				arrTile[tileId].id=jstr.id;
-				arrTile[tileId].lvl=0;
-				arrTile[tileId].prnt=-1;
-				arrTile[tileId].tex_x=0;
-				arrTile[tileId].tex_z=0;
-					
-				console.debug("Init done crt Root Tile  "+jstr.id+" ");
-				//determine a width and a height of cell
-				TLoad.stepGrid=(Math.abs(TLoad.startX)*2)/8;
-                var scale=TLoad.stepGrid;
-				var offset=0  // no offset for 0st lvl 
-				//count 1st coordinates for 1st tile
-				var startX=TLoad.startX;
-				var startZ=TLoad.startZ;
-				var x_=-1;
-				var z_=-1;
-				var index_=0;
-				//Creation of a grid
-                    for(var i_=0;i_<9;i_++){
-					    z_=startZ+(scale)*i_;
-					   for(var j_=0;j_<9;j_++){
-					      x_=startX+(scale)*j_;
-		                  arrTile[tileId].triangleGeometry.vertices.push(new THREE.Vector3( x_,parseFloat(jstr.verts[index_]),z_));
-				          console.debug("index "+index_+" x "+x_+" jstr.verts[index] "+jstr.verts[index_]+" z "+z_);
-						  index_++;
-						             }
-									 j_=0;
-											};
-				initFaceTex(arrTile[tileId]);							
-                vec1=arrTile[tileId].triangleGeometry.vertices[0];
-                vec2=arrTile[tileId].triangleGeometry.vertices[8];
-                vec3=arrTile[tileId].triangleGeometry.vertices[72];
-                vec4=arrTile[tileId].triangleGeometry.vertices[80];
-                min1=Math.min(vec4.y,vec3.y);min2=Math.min(vec2.y,vec1.y);min=Math.min(min1,min2);
-                max1=Math.max(vec4.y,vec3.y);max2=Math.max(vec2.y,vec1.y);max=Math.max(max1,max2);
-                ceny=(min+max)/2.0;
-                cenx=(vec2.x+vec1.x)/2.0;
-                cenz=(vec2.z+vec3.z)/2.0;
-                arrTile[tileId].center=new THREE.Vector3(cenx,ceny,cenz);
-				crtMesh(jstr.id);
-                arrCurRoot.unshift(tileId);
-                jstr=null;					
-					  
-                            }
-				                      }
-									  
-			
+
 			
 			//function is called in response to a request from the server to get the tile by id
-			function update_data(s) {
-			//clearInterval(timerid);
-			//var div = document.getElementById('cont');
-            //alert(s);
-			    //str_vert=s.trim();//!!! убери в  генераторе в конце пробел
-			    //var arr_verts = str_vert.split(/\s+/);
-				 tileId=-1;
+			function responseServer(s) {
+			
+				tileId=-1;
 				var flagroot=false;
+				var findtile=false;
 				var jstr;
 				jstr=JSON.parse(''+s);
-				//console.debug("cur_root.id  "+cur_root.id)
 				
-				//if(TLoad.idforloadroot==jstr.id)flagroot=true;
-                 findtile=false;
+                if(jstr.id>=0){				
 				 for(j in arrCurRoot){
 				     cur_ID=arrCurRoot[j];
-					//if(flagroot){
-					   //if(cur_ID==jstr.id){console.debug("create tile  "+jstr.id+" "+arrTile[cur_ID]);tile=arrTile[cur_ID];flagroot=true;break;}
-					          //  }
-					//else{			
+		
                        if(cur_ID*4+1==jstr.id){tileId=cur_ID*4+1;arrTile[tileId]=new Tile();arrTile[tileId].id=jstr.id;arrTile[tileId].tex_x=2*arrTile[cur_ID].tex_x;arrTile[tileId].tex_z=2*arrTile[cur_ID].tex_z;arrTile[cur_ID].childs[0]=jstr.id;console.debug("tex x  "+arrTile[tileId].tex_x+" y "+arrTile[tileId].tex_z);arrTile[tileId].lvl=arrTile[cur_ID].lvl+1;findtile=true;break;}
 					   if(cur_ID*4+2==jstr.id){tileId=cur_ID*4+2;arrTile[tileId]=new Tile();arrTile[tileId].id=jstr.id;arrTile[tileId].tex_x=2*arrTile[cur_ID].tex_x+1;arrTile[tileId].tex_z=2*arrTile[cur_ID].tex_z;arrTile[cur_ID].childs[1]=jstr.id;console.debug("tex x  "+arrTile[tileId].tex_x+" y "+arrTile[tileId].tex_z);arrTile[tileId].lvl=arrTile[cur_ID].lvl+1;findtile=true;break;}
 					   if(cur_ID*4+3==jstr.id){tileId=cur_ID*4+3;arrTile[tileId]=new Tile();arrTile[tileId].id=jstr.id;arrTile[tileId].tex_x=2*arrTile[cur_ID].tex_x;arrTile[tileId].tex_z=2*arrTile[cur_ID].tex_z+1;arrTile[cur_ID].childs[2]=jstr.id;console.debug("tex x  "+arrTile[tileId].tex_x+" y "+arrTile[tileId].tex_z);arrTile[tileId].lvl=arrTile[cur_ID].lvl+1;findtile=true;break;}
 					   if(cur_ID*4+4==jstr.id){tileId=cur_ID*4+4;arrTile[tileId]=new Tile();arrTile[tileId].id=jstr.id;arrTile[tileId].tex_x=2*arrTile[cur_ID].tex_x+1;arrTile[tileId].tex_z=2*arrTile[cur_ID].tex_z+1;arrTile[cur_ID].childs[3]=jstr.id;console.debug("tex x  "+arrTile[tileId].tex_x+" y "+arrTile[tileId].tex_z);arrTile[tileId].lvl=arrTile[cur_ID].lvl+1;findtile=true;break;}
-					   // }
-					 //delete cur_ID;
-                     //console.debug("del cur "+r);
+
                      cur_ID=null					 
 					}
-				 //console.debug("!findtile "+(!findtile)+" id "+jstr.id+" triangleMesh[(jstr.id*4+1)] "+triangleMesh[(jstr.id*4+1)]);	
+
 				if(!findtile&&triangleMesh[(jstr.id*4+1)]&&triangleMesh[(jstr.id*4+2)]&&triangleMesh[(jstr.id*4+3)]&&triangleMesh[(jstr.id*4+4)]/*&&arrTile[jstr.id]*/){
 				/*console.debug("create tile  "+jstr.id+" "+arrTile[jstr.id]);*/
 				tileId=jstr.id;
@@ -409,52 +284,31 @@ this.loaded = function () {
 				var lvl=-1;
 				for(t=0;t<=TLoad.maxid;t=(t*4+4)){lvl++;if(jstr.id<=t)break}
 				arrTile[tileId].lvl=lvl
+				arrTile[tileId].tex_x=arrTile[(tileId*4+1)].tex_x/2;
+				arrTile[tileId].tex_z=arrTile[(tileId*4+1)].tex_z/2;
 				flagroot=true;}
 				
-				if(flagroot){
+				if(!Exist1stTl){
 				
-				    arrTile[tileId].tex_x=arrTile[(tileId*4+1)].tex_x/2;
-					arrTile[tileId].tex_z=arrTile[(tileId*4+1)].tex_z/2;
-					//console.debug("tex x  "+arrTile[tileId].tex_x+" y "+arrTile[tileId].tex_y);
-					crtMesh(jstr.id);
+				if(jstr.id==0){
+				tileId=jstr.id;
+				arrTile[tileId]=new Tile();
+				arrTile[tileId].id=jstr.id;
+				arrTile[tileId].lvl=0;
+				//arrTile[tileId].prnt=-1;
+				arrTile[tileId].tex_x=0;
+				arrTile[tileId].tex_z=0;
 					
-					console.debug("crt  "+jstr.id+" ");
-					console.debug("del  "+(jstr.id*4+1)+" ");
-					console.debug("del  "+(jstr.id*4+2)+" ");
-					console.debug("del  "+(jstr.id*4+3)+" ");
-					console.debug("del  "+(jstr.id*4+4)+" ");
-                    deltilemesh((jstr.id*4+1));
-					deltilemesh((jstr.id*4+2));
-					deltilemesh((jstr.id*4+3));
-					deltilemesh((jstr.id*4+4));
-					deltile((jstr.id*4+1));
-					deltile((jstr.id*4+2));
-					deltile((jstr.id*4+3));
-					deltile((jstr.id*4+4));
-					
-					arrCurRoot.unshift(tileId);
-					TLoad.idforloadroot=-1;
-		            TLoad.ReadyForRoot=true;
-					
-					TLoad.arTileForAdd.splice(0,TLoad.arTileForAdd.length);
-					TLoad.indx=0;
+				console.debug("Init done crt Root Tile  "+jstr.id+" ");
+				//determine a width and a height of cell
+				TLoad.stepGrid=(Math.abs(TLoad.startX)*2)/8;
+
                             }
+				
+				}
 								
                 if(tileId>=0){
 
-				/*var lvl=-1;
-				var frstIdlvl=0;
-				var countIdlvl;
-				for(var t=0;t<=MAXID;t=(t*4+4)){lvl++;if(jstr.id<=t)break;frstIdlvl=t+1;}
-				arrTile[tileId].lvl=lvl;
-                countIdlvl=Math.pow(4,lvl);
-				console.debug("countIdlvl "+countIdlvl+" frstIdlvl "+frstIdlvl)
-				
-				var col=(tileId-frstIdlvl)%Math.sqrt(countIdlvl);
-				var row=parseInt((tileId-frstIdlvl)/Math.sqrt(countIdlvl));
-				console.debug("id "+tileId+" col "+col+" row "+row)*/
-				//zxy=jstr.tex.split(" ");
-                //tile.tex=''+zxy[0]+'/'+zxy[1]+'/'+zxy[2];
 				arrTile[tileId].prnt=jstr.id==0?-1:((jstr.id-1)-((jstr.id-1)%4))/4;
 
 				var var1=Math.pow(2,arrTile[tileId].lvl);//number of tiles in row (specific lvl) 
@@ -464,9 +318,9 @@ this.loaded = function () {
 				//count 1st coordinates for concrete tile
 				var startX=TLoad.startX+offset*arrTile[tileId].tex_x;
 				var startZ=TLoad.startZ+offset*arrTile[tileId].tex_z;
-				console.debug("tileId "+tileId)
-				console.debug("startX "+startX)
-				console.debug("startZ "+startZ)
+				//console.debug("tileId "+tileId)
+				//console.debug("startX "+startX)
+				//console.debug("startZ "+startZ)
 				var x_=-1;
 				var z_=-1;
 				var index_=0;
@@ -483,22 +337,48 @@ this.loaded = function () {
 						             }
 									 j_=0;
 											};
-				initFaceTex(arrTile[tileId]);							
-                vec1=arrTile[tileId].triangleGeometry.vertices[0];
-                vec2=arrTile[tileId].triangleGeometry.vertices[8];
-                vec3=arrTile[tileId].triangleGeometry.vertices[72];
-                vec4=arrTile[tileId].triangleGeometry.vertices[80];
-                min1=Math.min(vec4.y,vec3.y);min2=Math.min(vec2.y,vec1.y);min=Math.min(min1,min2);
-                max1=Math.max(vec4.y,vec3.y);max2=Math.max(vec2.y,vec1.y);max=Math.max(max1,max2);
-                ceny=(min+max)/2.0;
-                cenx=(vec2.x+vec1.x)/2.0;
-                cenz=(vec2.z+vec3.z)/2.0;
-                arrTile[tileId].center=new THREE.Vector3(cenx,ceny,cenz);
+				initFaceTex(arrTile[tileId]);
+				if(!Exist1stTl){
+				  Exist1stTl=true;
+				  crtMesh(tileId);
+                  arrCurRoot.unshift(tileId);
+                  render();				  
+					           }
 				//var tex=''+arrTile[id].lvl+'/'+arrTile[id].tex_x+'/'+arrTile[id].tex_y;
                 //arrTile[tileId].texture=THREE.ImageUtils.loadTexture('http://c.tile.openstreetmap.org/'+tex+".png");
 				}
 				
-
+				if(flagroot){
+				
+					//console.debug("tex x  "+arrTile[tileId].tex_x+" y "+arrTile[tileId].tex_y);
+					console.debug("crt  "+jstr.id+" ");
+					console.debug("del  "+(jstr.id*4+1)+" ");
+					console.debug("del  "+(jstr.id*4+2)+" ");
+					console.debug("del  "+(jstr.id*4+3)+" ");
+					console.debug("del  "+(jstr.id*4+4)+" ");
+					crtMesh(jstr.id);
+					
+					
+                    deltilemesh((jstr.id*4+1));
+					deltilemesh((jstr.id*4+2));
+					deltilemesh((jstr.id*4+3));
+					deltilemesh((jstr.id*4+4));
+					deltile((jstr.id*4+1));
+					deltile((jstr.id*4+2));
+					deltile((jstr.id*4+3));
+					deltile((jstr.id*4+4));
+					
+					arrCurRoot.unshift(tileId);
+					TLoad.idforloadroot=-1;
+		            TLoad.ReadyForRoot=true;
+					
+					TLoad.arTileForAdd.splice(0,TLoad.arTileForAdd.length);
+					TLoad.indx=0;
+					
+					render();
+                            }
+				
+                    }else{console.debug("! Reject request id is out of range!");}
 					 //r=(delete tile);
                     // console.debug("del  "+r);
                       jstr=null;					
@@ -524,22 +404,41 @@ this.loaded = function () {
 
 			}
 			
-			function verify(){
+			/*function verify(){
 				//console.debug("TLoad.arTileForAdd.length "+TLoad.arTileForAdd.length)	
                 TLoad.loadTile();
 				
 			    //timerid=setInterval(verify, 20);
-			}
+			}*/
 			
-			function getDistance(cam,tile){
-			    //console.debug("dist for id "+tile)
-			    cam_pos=cam.position
-				ax=Math.max(cam_pos.x,arrTile[tile].center.x)-Math.min(cam_pos.x,arrTile[tile].center.x);
-				ay=Math.max(cam_pos.y,arrTile[tile].center.y)-Math.min(cam_pos.y,arrTile[tile].center.y);
-				az=Math.max(cam_pos.z,arrTile[tile].center.z)-Math.min(cam_pos.z,arrTile[tile].center.z);
-				cD=Math.sqrt(ax*ax+ay*ay+az*az);
+			function getDistance(cam,tlvl,tosmX,tosmZ){
+			    //console.debug("dist for xyz "+tlvl+" "+tosmX+" "+tosmZ)
+				
+				var var1=Math.pow(2,tlvl);//number of tiles in row (specific lvl) 
+				var scale=tlvl==0?TLoad.stepGrid:TLoad.stepGrid/(var1);//determine a width and a height of cell
+				var offset=tlvl==0?0:Math.abs(2*TLoad.startX)/(var1);  // determine an offset for 1st tile of specific lvl 
+				
+				var vec1X=TLoad.startX+offset*tosmX;
+				var vec1Z=TLoad.startZ+offset*tosmZ;
+				
+				var vec2X=TLoad.startX+offset*tosmX+(scale)*8;
+				var vec2Z=TLoad.startZ+offset*tosmZ;
+				
+				var vec3X=TLoad.startX+offset*tosmX;
+				var vec3Z=TLoad.startZ+offset*tosmZ+(scale)*8;
+				
+				var vec4X=TLoad.startX+offset*tosmX+(scale)*8;
+				var vec4Z=TLoad.startZ+offset*tosmZ+(scale)*8;
+				
+                var cenx=(vec2X+vec1X)/2.0;
+                var cenz=(vec2Z+vec3Z)/2.0;
+				
+				var ax=Math.max(cam.position.x,cenx)-Math.min(cam.position.x,cenx);
+				var ay=Math.max(cam.position.y,0)-Math.min(cam.position.y,0);
+				var az=Math.max(cam.position.z,cenz)-Math.min(cam.position.z,cenz);
+				var cD=Math.sqrt(ax*ax+ay*ay+az*az);
 				//cD=1 * cD.toFixed(1)
-				//console.debug("cR "+cD+"id "+tile)
+				//console.debug("cR "+cD+"lvl "+tlvl)
                 return cD				
 			}
 			
@@ -601,8 +500,8 @@ this.loaded = function () {
 
 			}
 			
-			function render() {
-				//wrt("cur_t_ids.length "+cur_t_ids.length+" ")//div.innerHTML+="cur_t_ids.length "+cur_t_ids.length+" "
+			function checkTiles() {
+			
 				console.debug(" ")
 				console.debug(" ")
 				//console.debug("tiles.length "+tiles.length)	
@@ -614,38 +513,32 @@ this.loaded = function () {
 				  console.debug("cur_ID "+cur_ID)
 				    flagDrop=false;
 			        chldsExist=true;
-				    //if the file exists but is not loaded call func 'land_func(IdTile)' to get data
-					//console.debug("cur_root.childs[3].id "+cur_root.childs[3].id)
-					if(arrTile[cur_ID].childs[0]<0){TLoad.pushTile(cur_ID*4+1);chldsExist=false;}
-					if(arrTile[cur_ID].childs[1]<0){TLoad.pushTile(cur_ID*4+2);chldsExist=false;}
-					if(arrTile[cur_ID].childs[2]<0){TLoad.pushTile(cur_ID*4+3);chldsExist=false;}
-					if(arrTile[cur_ID].childs[3]<0){TLoad.pushTile(cur_ID*4+4);chldsExist=false;}
-					//console.debug("cur_root.childs[3] "+cur_root.childs[3].id)
-					//console.debug("lvl "+cur_root.lvl)
-					//console.debug("chldsExist "+chldsExist)
-					//break
-					
-					//console.debug("arrTile[cur_ID].childs[0] "+arrTile[cur_ID].childs[0])
-					//console.debug("chldsExist "+chldsExist)
-			  if(arrTile[cur_ID].childs[0]>=0&&chldsExist){	 
+
+			  if(arrTile[cur_ID].id*4+1<=TLoad.maxid/*&&chldsExist*/){	 
 			  //constant distance of the current tile by level
 			  lvlconst=(arrTile[cur_ID].lvl*3.0);
 			  //console.debug("tiles[id] "+id+" "+lvlconst+" (lvlconst) "+lvlconst)
 			  activatedDistChild=21-lvlconst;
 			  //console.debug("arrTile[cur_ID].lvl "+arrTile[cur_ID].lvl)
-			  //console.debug("activatedDistChild "+activatedDistChild)
-				//console.debug("id "+id)
+			  console.debug("activatedDistChild "+activatedDistChild)
                 //at least one distance less Child
 				
-				
-			    if(getDistance(camera,(cur_ID*4+1))<activatedDistChild||getDistance(camera,(cur_ID*4+2))<activatedDistChild||getDistance(camera,(cur_ID*4+3))<activatedDistChild||getDistance(camera,(cur_ID*4+4))<activatedDistChild){
-				flagDrop=true;}
-				
-				/*if(getDistance(camera,ch_id2)<activatedDistChild){flagDrop=true;}	
-				if(getDistance(camera,ch_id3)<activatedDistChild){flagDrop=true;}	
-				if(getDistance(camera,ch_id4)<activatedDistChild){flagDrop=true;}*/				
+				var distToCh1=getDistance(camera,(arrTile[cur_ID].lvl+1),(arrTile[cur_ID].tex_x*2),(arrTile[cur_ID].tex_z*2));
+				var distToCh2=getDistance(camera,(arrTile[cur_ID].lvl+1),(arrTile[cur_ID].tex_x*2+1),(arrTile[cur_ID].tex_z*2));
+				var distToCh3=getDistance(camera,(arrTile[cur_ID].lvl+1),(arrTile[cur_ID].tex_x*2),(arrTile[cur_ID].tex_z*2+1));
+				var distToCh4=getDistance(camera,(arrTile[cur_ID].lvl+1),(arrTile[cur_ID].tex_x*2+1),(arrTile[cur_ID].tex_z*2+1));
+				console.debug("distToCh1 "+distToCh1)
+			    if(distToCh1<activatedDistChild||distToCh2<activatedDistChild||distToCh3<activatedDistChild||distToCh4<activatedDistChild)
+				{
+				flagDrop=true;
+				if(arrTile[cur_ID].childs[0]<0){TLoad.pushTile(cur_ID*4+1);chldsExist=false;}
+				if(arrTile[cur_ID].childs[1]<0){TLoad.pushTile(cur_ID*4+2);chldsExist=false;}
+				if(arrTile[cur_ID].childs[2]<0){TLoad.pushTile(cur_ID*4+3);chldsExist=false;}
+				if(arrTile[cur_ID].childs[3]<0){TLoad.pushTile(cur_ID*4+4);chldsExist=false;}
+				}
+							
 				//drop to the level below (divide by 4 quad)
-				   if(flagDrop){
+				   if(flagDrop&&chldsExist){
 				    
 					deltilemesh(cur_ID,false)
 					deltile(cur_ID,false)
@@ -663,7 +556,8 @@ this.loaded = function () {
 					arrCurRoot.push((cur_ID*4+2));
 					arrCurRoot.push((cur_ID*4+3));
 					arrCurRoot.push((cur_ID*4+4));
-						
+					
+                    //render();					
 					//console.debug("break ")
 					break;			
                                 }
@@ -696,7 +590,12 @@ this.loaded = function () {
 				    activatedDistPrnt=21.0-lvlconst
 					//console.debug("activatedDistPrnt "+activatedDistPrnt)
 					//distance to all tiles is bigger than constant to parent
-				 	if(getDistance(camera,ch_id1)>activatedDistPrnt&&getDistance(camera,ch_id2)>activatedDistPrnt&&getDistance(camera,ch_id3)>activatedDistPrnt&&getDistance(camera,ch_id4)>activatedDistPrnt){
+					var distFromCh1=getDistance(camera,arrTile[ch_id1].lvl,arrTile[ch_id1].tex_x,arrTile[ch_id1].tex_z);
+				    var distFromCh2=getDistance(camera,arrTile[ch_id2].lvl,arrTile[ch_id2].tex_x,arrTile[ch_id2].tex_z);
+				    var distFromCh3=getDistance(camera,arrTile[ch_id3].lvl,arrTile[ch_id3].tex_x,arrTile[ch_id3].tex_z);
+				    var distFromCh4=getDistance(camera,arrTile[ch_id4].lvl,arrTile[ch_id4].tex_x,arrTile[ch_id4].tex_z);
+				
+				 	if(distFromCh1>activatedDistPrnt&&distFromCh2>activatedDistPrnt&&distFromCh3>activatedDistPrnt&&distFromCh4>activatedDistPrnt){
 					flagRise=true;
 					count=0;
 					for(i=0 ;i< arrCurRoot.length;i++){
@@ -723,10 +622,13 @@ this.loaded = function () {
                                        }
 					
 				if(TLoad)TLoad.loadTile();
-				renderer.render( scene, camera );
-				stats.update();
-
+                render();
 			
+			}
+			
+			function render() {
+			    renderer.render( scene, camera );
+				stats.update();
 			}
 
 			
