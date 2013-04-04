@@ -12,6 +12,9 @@ THREE.CameraController = function ( object, domElement )
 
     this.userZoom = true;
     this.userZoomSpeed = 1.0;
+	this.phi=0;
+	this.theta=0;
+	this.radius=this.object.position.clone().subSelf( this.center ).length();
 
     this.userRotate = true;
     this.userRotateSpeed = 1.0;
@@ -151,8 +154,8 @@ THREE.CameraController = function ( object, domElement )
 
         }
 
-        theta += thetaDelta;
-        phi += phiDelta;
+        theta += thetaDelta;scope.theta=theta;
+        phi += phiDelta;scope.phi=phi;
 
         // restrict phi to be between desired limits
         phi = Math.max( this.minPolarAngle, Math.min( this.maxPolarAngle, phi ) );
@@ -161,7 +164,7 @@ THREE.CameraController = function ( object, domElement )
         phi = Math.max( EPS, Math.min( Math.PI - EPS, phi ) );
 
         var radius = offset.length() * scale;
-
+        scope.radius = radius;
         // restrict radius to be between desired limits
         radius = Math.max( this.minDistance, Math.min( this.maxDistance, radius ) );
 
