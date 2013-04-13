@@ -1,5 +1,5 @@
 <?php
- header('Content-type: text/html; utf-8');
+ header('Content-Type: text/xml; utf-8');
  
 require_once("config.php");
 
