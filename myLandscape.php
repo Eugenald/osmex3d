@@ -68,6 +68,29 @@ function Tile () {
     };
 	
 }
+//Class Building
+function TileBlds () {
+    this.id;//id of tile
+	this.x;
+	this.z;
+	this.scale_x;
+	this.scale_z;
+	this.minlon;
+	this.minlat;
+    this.arrIndxsBlds = new Array();
+	this.destroy = function () {
+         delete this.id;
+		 delete this.scale_x;
+		 delete this.scale_z;
+		 delete this.minlon;
+		 delete this.minlat;
+		 delete this.x;
+		 delete this.z;
+		delete this.arrIndxsBlds
+		this.arrIndxsBlds=null;
+    };
+	
+}
 
 
 			if ( ! Detector.webgl ) Detector.addGetWebGLMessage();
@@ -76,16 +99,13 @@ function Tile () {
 			
 			var arrCurRoot = new Array();
 			var arrTile = new Array();
+			var arrTileBlds = new Array();
 
 			var timerid=0;
 			var Exist1stTl=false;
 			var UnitToPixelScale;
 			var tileSizeRoot=3454245.2736;// in [m]
-			var scale_xy = 1727122.6368;
-			var OSM_h=157.129/(scale_xy);
-			var OSM_w=180.00/(scale_xy);
-			var flag17=false;
-			var rendtile=-1;
+			var lvlbldactive=-1;
 			
 			var camera, controls, scene, renderer;
 			var maxAnisotropy;
@@ -95,6 +115,7 @@ function Tile () {
 			var cross;
 			
 			var triangleMesh = new Array();
+			var MeshOfBlds = new Array();
 			var arrTex = new Array();
 
             var div = document.getElementById('cont');
@@ -103,6 +124,7 @@ function Tile () {
 			
 			var div_bld = document.getElementById('build');
 			div_bld.ongetdata =responseServerCubes;
+			div_bld.style.display="none";
 			
 			init();
 			animate();
@@ -154,7 +176,7 @@ this.pushTile = function (IdTile) {
 };
 
 this.pushTileCube = function (strXspaceZ) {                 
-    if(!this.tileCubeinQueue(strXspaceZ)){this.arTileCubeForAdd.push(strXspaceZ);}
+    if(true/*!this.tileCubeinQueue(strXspaceZ)*/){this.arTileCubeForAdd.push(strXspaceZ);}
 };	
 
       //load and check flag of readiness
@@ -276,35 +298,6 @@ function getTanDeg(deg) {
 			   //land_func(300)
 			   
 			   document.addEventListener('keydown',onDocumentKeyDown,false);
-			   
-			   /*var minlon = -180
-			   var minlat = -90
-			   var maxlon = 180
-			   var maxlat = 90
-			   var scale_xy = 1727122.6368
-			   var OSM_h=157.125/(scale_xy);
-			   var OSM_w=180.00/(scale_xy);
-			   
-			   var cube = new THREE.Mesh(
-                   new THREE.CubeGeometry(0.1,0.1,0.1),
-                   //new THREE.MeshBasicMaterial({color: 0x000000, opacity: 1})
-				   new THREE.MeshBasicMaterial({
-				        color: 0x000000//,
-				        //'map':texture,
-				        //wireframe: false,
-				        //side:THREE.DoubleSide,
-                        //'overdraw': true
-				                })
-                   );
-			   var x=10.86618/OSM_w;
-               var z=48.360875/OSM_h;
-			   cube.position.set(x,0.5,-z);
-               cube.scale.set(9.995347,8,5.481119);  
-			   cube.rotation.set(0.0, -0.113448, 0.0);
-               scene.add(cube);*/
-			   
-			   
-			   
 
 			}
 			
@@ -512,7 +505,7 @@ function getTanDeg(deg) {
                       jstr=null;					
 					  TLoad.loaded()
 //console.debug("load id  "+TLoad.loaded())
-               var c0=triangleMesh[0].geometry.vertices[0];
+               /*var c0=triangleMesh[0].geometry.vertices[0];
 			   var c1=triangleMesh[0].geometry.vertices[8];
 			   var c2=triangleMesh[0].geometry.vertices[72];
 			   var c3=triangleMesh[0].geometry.vertices[80];
@@ -522,7 +515,7 @@ function getTanDeg(deg) {
 			   console.debug("c1 "+c1.z)
 			   console.debug("c2 "+c2.z)
 			   console.debug("range_x "+range_x)
-			   console.debug("range_z "+range_z)
+			   console.debug("range_z "+range_z)*/
 			   
 				                      }
 									  
@@ -531,43 +524,30 @@ function getTanDeg(deg) {
 				var jstr;
 				//console.debug(s)
 				jstr=JSON.parse(''+s);
-				if(jstr.builds[0]!=undefined){
-				//alert(" Build id "+jstr.builds[0].id)
+				if(jstr.tile_id>=0&&arrTileBlds[jstr.tile_id].id!=undefined){
+				   var id=jstr.tile_id;
+				   //alert("builtile "+id)
                    for(var j=0;j<jstr.builds.length;j++){
-				       /*console.debug*///alert(" Build id "+jstr.builds[j].id)
-					   var cube = new THREE.Mesh(
-                   new THREE.CubeGeometry(0.25,0.2,0.25),
-                   //new THREE.MeshBasicMaterial({color: 0x000000, opacity: 1})
-				   new THREE.MeshBasicMaterial({
-				        color: 0x000000//,
-				        //'map':texture,
-				        //wireframe: false,
-				        //side:THREE.DoubleSide,
-                        //'overdraw': true
+				       var b=parseInt(jstr.builds[j].build_id);
+				       //console.debug(" Build id "+b)
+					   MeshOfBlds[b] = new THREE.Mesh(
+                            new THREE.CubeGeometry(0.25,0.2,0.25),
+                           //new THREE.MeshBasicMaterial({color: 0x000000, opacity: 1})
+				           new THREE.MeshBasicMaterial({
+				           color: 0x000000//,
+				           //'map':texture,
+				           //wireframe: false,
+				           //side:THREE.DoubleSide,
+                           //'overdraw': true
 				                })
-                   );
-			   var lon=parseFloat(jstr.builds[j].positionLon);///OSM_w;
-               var lat=parseFloat(jstr.builds[j].positionLat);///OSM_h;
-			   var minlon=tile2lon(arrTile[jstr.tile_id].tex_x,arrTile[jstr.tile_id].lvl);
-			   var maxlon=tile2lon(arrTile[jstr.tile_id].tex_x+1,arrTile[jstr.tile_id].lvl);
-			   var minlat=tile2lat(arrTile[jstr.tile_id].tex_z+1,arrTile[jstr.tile_id].lvl);
-			   var maxlat=tile2lat(arrTile[jstr.tile_id].tex_z,arrTile[jstr.tile_id].lvl);
-			   var range_lon=maxlon-minlon;
-			   var range_lat=maxlat-minlat;
-			   var c0=triangleMesh[jstr.tile_id].geometry.vertices[0];
-			   var c1=triangleMesh[jstr.tile_id].geometry.vertices[8];
-			   var c2=triangleMesh[jstr.tile_id].geometry.vertices[72];
-			   var c3=triangleMesh[jstr.tile_id].geometry.vertices[80];
-			   var range_x=Math.max(c1.x,c0.x)-Math.min(c1.x,c0.x);
-			   var range_z=Math.max(c0.z,c2.z)-Math.min(c0.z,c2.z);
-			   var scale_x=range_x/range_lon;
-			   var scale_z=range_z/range_lat;
-			   
-			   cube.position.set(c0.x+(lon-minlon)*scale_x,0.5,c3.z-(lat-minlat)*scale_z);
-               cube.scale.set(parseFloat(jstr.builds[j].scaleX),8,parseFloat(jstr.builds[j].scaleZ));  
-			   cube.rotation.set(parseFloat(jstr.builds[j].rotationX), parseFloat(jstr.builds[j].rotationY), parseFloat(jstr.builds[j].rotationZ));
-               scene.add(cube);
-			   
+                            );
+			    var lon=parseFloat(jstr.builds[j].positionLon);///OSM_w;
+                var lat=parseFloat(jstr.builds[j].positionLat);///OSM_h;
+			    MeshOfBlds[b].position.set(arrTileBlds[id].x+(lon-arrTileBlds[id].minlon)*arrTileBlds[id].scale_x,0.5,arrTileBlds[id].z-(lat-arrTileBlds[id].minlat)*arrTileBlds[id].scale_z);
+                MeshOfBlds[b].scale.set(parseFloat(jstr.builds[j].scaleX),8,parseFloat(jstr.builds[j].scaleZ));  
+			    MeshOfBlds[b].rotation.set(parseFloat(jstr.builds[j].rotationX), parseFloat(jstr.builds[j].rotationY), parseFloat(jstr.builds[j].rotationZ));
+                scene.add( MeshOfBlds[b]);
+				arrTileBlds[id].arrIndxsBlds[j]=b;
 					   }
 				render();	   
 				}
@@ -657,6 +637,7 @@ function getTanDeg(deg) {
 				  if(triangleMesh[(id*4+3)])deltilemesh((id*4+3));
 				  if(triangleMesh[(id*4+4)])deltilemesh((id*4+4));
 				}
+
 				//triangleMesh.splice(id,1);
 				//console.debug("del "+triangleMesh[id]+" id "+id+" "+r)
 			}
@@ -673,7 +654,39 @@ function getTanDeg(deg) {
 				  if(arrTile[(id*4+3)])deltile((id*4+3));
 				  if(arrTile[(id*4+4)])deltile((id*4+4));
 				}
+				delbuildsoftile(id);
 				console.debug("Delete "+arrTile[id]+" id "+id)
+			}
+			
+			function delbuildsoftile(id){
+			    if(arrTileBlds[id]&&!arrTile[(id*4+1)]){
+				  //alert("del "+id+" "+arrTileBlds[id].arrIndxsBlds[0])
+				  if(arrTileBlds[id].arrIndxsBlds[0]!=undefined)
+				    {
+					//alert("del arrTileBlds[id].arrIndxsBlds.length() "+arrTileBlds[id].arrIndxsBlds.length())
+				     for(var i in arrTileBlds[id].arrIndxsBlds)
+		                {
+						  var b=arrTileBlds[id].arrIndxsBlds[i];
+		                  //alert("del build "+b)
+		                  scene.remove(MeshOfBlds[b]);
+                          renderer.deallocateObject(MeshOfBlds[b]);
+			              //renderer.deallocateTexture(arrTex[id]);
+			              //delete arrTex[id];
+			              //arrTex[id]=null;
+			              delete MeshOfBlds[b];
+			              MeshOfBlds[b]=null
+		                }
+		              //arrTileBlds[id].arrIndxsBlds.splice(0,arrTileBlds[id].arrIndxsBlds.length);
+		             }
+				  arrTileBlds[id].destroy();
+				  delete arrTileBlds[id];
+				  arrTileBlds[id]=null;
+				 }
+			
+					 
+		 
+		   
+		
 			}
 			
 			function crtMesh(id){
@@ -722,19 +735,33 @@ function getTanDeg(deg) {
               //if(arrTile[cur_ID].lvl>=17)console.debug("dist "+dist+ "; id "+cur_ID+"; lvl "+arrTile[cur_ID].lvl+" pixelTileSize "+pixelTileSize)	
              // console.debug("dist "+dist+ "; id "+cur_ID+"; lvl "+arrTile[cur_ID].lvl)		  
               //console.debug("pixelTileSize "+pixelTileSize + " "+cur_ID)
-			  if(arrTile[cur_ID].lvl==18/*&&flag17!=true*/)
+			  if(dist<=200&&lvlbldactive<0)lvlbldactive=arrTile[cur_ID].lvl;
+			  if(arrTile[cur_ID].lvl==lvlbldactive&&!arrTileBlds[cur_ID])
 			  {
-			    // flag17=true;
-				 //rendtile=cur_ID;
+
+				 arrTileBlds[cur_ID]=new TileBlds();
+				 arrTileBlds[cur_ID].id=cur_ID;
 				 var minlon=tile2lon(arrTile[cur_ID].tex_x,arrTile[cur_ID].lvl)
 				 var maxlon=tile2lon(arrTile[cur_ID].tex_x+1,arrTile[cur_ID].lvl)
 				 var minlat=tile2lat(arrTile[cur_ID].tex_z+1,arrTile[cur_ID].lvl)
 				 var maxlat=tile2lat(arrTile[cur_ID].tex_z,arrTile[cur_ID].lvl)
+			     var range_lon=maxlon-minlon;
+			     var range_lat=maxlat-minlat;
+			     var c0=triangleMesh[cur_ID].geometry.vertices[0];
+			     var c1=triangleMesh[cur_ID].geometry.vertices[8];
+			     var c2=triangleMesh[cur_ID].geometry.vertices[72];
+			     var c3=triangleMesh[cur_ID].geometry.vertices[80];
+			     var range_x=Math.max(c1.x,c0.x)-Math.min(c1.x,c0.x);
+			     var range_z=Math.max(c0.z,c2.z)-Math.min(c0.z,c2.z);
+				 arrTileBlds[cur_ID].scale_x=range_x/range_lon;
+			     arrTileBlds[cur_ID].scale_z=range_z/range_lat;
+				 arrTileBlds[cur_ID].minlon=minlon;
+				 arrTileBlds[cur_ID].minlat=minlat;
+				 arrTileBlds[cur_ID].z=c3.z;
+				 arrTileBlds[cur_ID].x=c0.x;
+				 
                  TLoad.pushTileCube(""+arrTile[cur_ID].id+" "+minlon+" "+minlat+" "+maxlon+" "+maxlat);
-				 //TLoad.pushTileCube(""+arrTile[cur_ID].tex_x+" "+arrTile[cur_ID].tex_z);
-				 //alert(" for Tileid "+cur_ID+" minlon "+minlon+" maxlon "+maxlon+" minlat "+minlat+" maxlat "+maxlat)
-				 //console.debug("\n\n minlon "+minlon+" maxlon "+maxlon+" minlat "+minlat+" maxlat "+maxlat+" id "+cur_ID)
-				 //dbg.innerHTML="minlon "+minlon+" maxlon "+maxlon+" minlat "+minlat+" maxlat "+maxlat;
+				 
 			  }
 			  //if(flag17&&arrTile[cur_ID].lvl<18)triangleMesh[arrTile[cur_ID].id].visible=false;
 			  //if(flag17&&arrTile[cur_ID].id!=rendtile)triangleMesh[arrTile[cur_ID].id].visible=false;
