@@ -30,8 +30,10 @@ require_once("server_scripts/config.php");
 		<div  jstcache="0"  id="container"></div>
 		
 		<script src="jscripts/three.js"></script>
-
+		
+        <script src="jscripts/Camera.js"></script>
         <script src="jscripts/CameraController.js"></script>
+		
 
 		<script src="jscripts/Detector.js"></script>
 		<script src="jscripts/stats.min.js"></script>
@@ -53,6 +55,7 @@ function Tile () {
     this.childs[2]=-1;
 	this.childs[3]=-1;
     this.prnt;//parent
+	this.texExist=false;
 	this.texture;
 	this.triangleGeometry = new THREE.Geometry();
 	this.destroy = function () {
@@ -102,10 +105,13 @@ function TileBlds () {
 			var arrTileBlds = new Array();
 
 			var timerid=0;
+			var timeoutId=1;
+			var initTiles = new Array();
 			var Exist1stTl=false;
 			var UnitToPixelScale;
 			var tileSizeRoot=3454245.2736;// in [m]
 			var lvlbldactive=-1;
+			var maxidinque=-1;
 			
 			var camera, controls, scene, renderer;
 			var maxAnisotropy;
@@ -117,6 +123,8 @@ function TileBlds () {
 			var triangleMesh = new Array();
 			var MeshOfBlds = new Array();
 			var arrTex = new Array();
+			
+			var bverify=true;
 
             var div = document.getElementById('cont');
 			//div.style.display="none";
@@ -125,9 +133,7 @@ function TileBlds () {
 			var div_bld = document.getElementById('build');
 			div_bld.ongetdata =responseServerCubes;
 			div_bld.style.display="none";
-			
-			init();
-			animate();
+
 			
 //Object ( dynamically add the necessary tiles)
 
@@ -136,7 +142,7 @@ var TLoad = new function () {
 	//set 1st coordinates for 1st tileRoots
 	this.startX=-1727122.6368;
 	this.startZ=-1727122.6368;
-	this.stepGrid=-1;
+	this.stepGrid=(Math.abs(this.startX)*2)/8;
 	this.idforloadroot=-1;
 	this.ReadyForRoot=true;
     this.indx=0;
@@ -144,6 +150,7 @@ var TLoad = new function () {
     this.ready=true;                 //a flag of readiness
     this.arTileForAdd = new Array(); //the queue of  tiles for loading
 	this.arTileCubeForAdd = new Array(); //the queue of  tiles for loading
+	this.requestBld=true;
 	
 this.prepareRootID = function (rootid) {
       if(this.ReadyForRoot){
@@ -177,14 +184,25 @@ this.pushTile = function (IdTile) {
 
 this.pushTileCube = function (strXspaceZ) {                 
     if(true/*!this.tileCubeinQueue(strXspaceZ)*/){this.arTileCubeForAdd.push(strXspaceZ);}
-};	
+};
+
+this.needforload = function () {
+   if(this.indx<this.arTileForAdd.length||this.indxCube<this.arTileCubeForAdd.length)return true;
+   else{return false;}
+}   
 
       //load and check flag of readiness
 this.loadTile = function () {
    if(this.ready==true&&(this.indx<this.arTileForAdd.length||this.indxCube<this.arTileCubeForAdd.length)){
-      if(this.indx<this.arTileForAdd.length){
-         var id=this.arTileForAdd[this.indx/*this.arTileForAdd.length-1*/];
-         if(id>=0){this.indx++;this.ready=false;land_func(id);}
+      if(this.indx<this.arTileForAdd.length&&this.requestBld){
+         var id=this.arTileForAdd[this.indx];
+         if(id>=0)
+		 {
+		    this.indx++;
+			this.ready=false;
+			land_func(id);
+			if(this.indxCube<this.arTileCubeForAdd.length)this.requestBld=false;
+		 }
 	  }
 	else{
 		if(this.indxCube<this.arTileCubeForAdd.length){
@@ -192,13 +210,15 @@ this.loadTile = function () {
 		    if(id.length>0){
 			   this.indxCube++;this.ready=false;
 			   var lanlot=id.split(' ');//console.debug(parseInt(xz[0])+" "+parseInt(xz[1]));
-			   build_func(parseFloat(lanlot[0])/*tile_id*/,parseFloat(lanlot[1]),parseFloat(lanlot[2]),parseFloat(lanlot[3]),parseFloat(lanlot[4]));
+			   build_func(parseFloat(lanlot[0]),parseFloat(lanlot[1]),parseFloat(lanlot[2]),parseFloat(lanlot[3]),parseFloat(lanlot[4]));
 			   //var xz=id.split(' ');//console.debug(parseInt(xz[0])+" "+parseInt(xz[1]));
 			   //build_func(parseInt(xz[0]),parseInt(xz[1]));
+			   this.requestBld=true;
 			   }
 			}
 	}
-	                               }
+	
+	                               }						   
 };
 	
 	//set flag of readiness
@@ -209,28 +229,154 @@ this.loaded = function () {
 		
 }
 
+			init();
+			animate();
 
-function getTanDeg(deg) {
+
+            function getTanDeg(deg) {
 
                var rad = deg * Math.PI/180;
 
                return Math.tan(rad)
 
             }
+			
+			function verdrop(id,x,z,lvl)
+				{
+				  var dist=getDistance(camera,lvl,x,z);	
+				  var pixelTileSize=tileSizeRoot/ Math.pow(2,lvl)*UnitToPixelScale/dist;
+				  if(dist<=200&&lvlbldactive<0)lvlbldactive=lvl;
+				  
+				  /*if(lvl==8)
+			      {
+				   var minlon=tile2lon(x,lvl)
+				   var maxlon=tile2lon(x+1,lvl)
+				   var minlat=tile2lat(z+1,lvl)
+				   var maxlat=tile2lat(z,lvl)
+				   //alert("id "+id+" minlon "+minlon+" minlat "+minlat+" maxlon "+maxlon+" maxlat "+maxlat); 
+				   console.debug("id "+id+" lvl "+lvl+" minlon "+minlon+" minlat "+minlat+" maxlon "+maxlon+" maxlat "+maxlat)
+				   }*/
+				  
+			      if(lvl==lvlbldactive&&!arrTileBlds[id])
+			      {
+				   arrTileBlds[id]=new TileBlds();
+				   arrTileBlds[id].id=id;
+				   var minlon=tile2lon(x,lvl)
+				   var maxlon=tile2lon(x+1,lvl)
+				   var minlat=tile2lat(z+1,lvl)
+				   var maxlat=tile2lat(z,lvl)
+			       var range_lon=maxlon-minlon;
+			       var range_lat=maxlat-minlat;
+				   //alert(minlon+" "+minlat+" "+maxlon+" "+maxlat)
+				   var c=new Array();
+				   var var1=Math.pow(2,lvl);//number of tiles in row (specific lvl) 
+				   var scale=id==0?TLoad.stepGrid:TLoad.stepGrid/(var1);//determine a width and a height of cell
+				   var offset=id==0?0:Math.abs(2*TLoad.startX)/(var1);  // determine an offset for 1st tile of specific lvl 
+				   var startX=TLoad.startX+offset*x;
+				   var startZ=TLoad.startZ+offset*z;
+				   var x_=-1;
+				   var z_=-1;
+				   var i_=0;
+				   var j_=0;
+				   //Creation of a grid
+				   for(;i_<9;i_+=8){
+				   	z_=startZ+(scale)*i_;
+				   	for(;j_<9;j_+=8){
+				   		x_=startX+(scale)*j_;
+				           c.push(new THREE.Vector3(x_,0.0,z_));
+						   //alert(x_+" "+z_+" "+startX+" "+scale)
+				   				}
+				   				j_=0;
+				   				};
+					/*for(var v=0;v<4;v++){
+                       alert(c[v].x+" "+c[v].y+" "+c[v].z)
+                     }	*/				
+				
+			       var range_x=Math.max(c[1].x,c[0].x)-Math.min(c[1].x,c[0].x);
+			       var range_z=Math.max(c[0].z,c[2].z)-Math.min(c[0].z,c[2].z);
+				   arrTileBlds[id].scale_x=range_x/range_lon;
+			       arrTileBlds[id].scale_z=range_z/range_lat;
+				   arrTileBlds[id].minlon=minlon;
+				   arrTileBlds[id].minlat=minlat;
+				   arrTileBlds[id].z=c[3].z;
+				   arrTileBlds[id].x=c[0].x;
+				 
+                   TLoad.pushTileCube(""+id+" "+minlon+" "+minlat+" "+maxlon+" "+maxlat);
+				 
+			     }
+			  
+				  if(lvl<=18&&pixelTileSize>=384)
+				  {
+					
+					/*timeoutId = setTimeout(*/verdrop(id*4+1,2*x,2*z,lvl+1)//, 5);
+					/*timeoutId = setTimeout(*/verdrop(id*4+2,2*x+1,2*z,lvl+1)//, 5)
+					/*timeoutId = setTimeout(*/verdrop(id*4+3,2*x,2*z+1,lvl+1)//, 5)
+					/*timeoutId = setTimeout(*/verdrop(id*4+4,2*x+1,2*z+1,lvl+1)//, 5);
+			  
+				  }
+				  else{var tileId=id;arrTile[tileId]=new Tile();arrTile[tileId].id=tileId;/*alert(tileId+" "+arrTile[tileId].id);*/arrTile[tileId].tex_x=x;arrTile[tileId].tex_z=z;arrTile[tileId].lvl=lvl;if(maxidinque<id){maxidinque=id;initTiles.unshift(id);}else{initTiles.push(id);}/*TLoad.pushTile(id);*//*arrCurRoot.push((id));*/ return 0;}
+
+				}			
 
 			function init() {
-			    land_func(0);// load 1st tileroots
-				camera = new THREE.PerspectiveCamera( 45, window.innerWidth / window.innerHeight, 0.01, 10000000 );
-				camera.position.set(0, 3454245.2736, 0.0);
+			    //land_func(0);// load 1st tileroots
+				//camera = new THREE.PerspectiveCamera( 45, window.innerWidth / window.innerHeight, 0.01, 10000000 );
+				camera = new OSMEX.Camera( window.innerWidth,window.innerHeight,45, 0.01, 10000000 , 0.01, 10000000 );
+				//camera.position.set(0, 3454245.2736, 0.0);
 				UnitToPixelScale = window.innerHeight /( 2.0 * getTanDeg(camera.fov / 2.0));
 
-                controls = new THREE.CameraController( camera );
-                controls.userZoomSpeed = 0.3;
+                controls = new OSMEX.CameraController( camera );
+                //controls.userZoomSpeed = 0.43;
+				controls.ZoomSpeed = 0.43;
+				
+	
+//format http://www.openstreetmap.org/?minlon=37.6564178466797&minlat=55.7784729003906&maxlon=37.656421661377&maxlat=55.7784767150879			
+var minlon = 10.864089//33.27//30.73337;
+var minlat = 48.359646//44.36//46.46916;
+
+var maxlon = 10.867646//34.85//30.74049;
+var maxlat = 48.362105//45.1//46.47458;
+
+				
+				
+				
+var cenlon=(maxlon-minlon)/2 + minlon
+var cenlat=(maxlat-minlat)/2 + minlat
+var _x=lon2tile(cenlon,18)
+var _z=lat2tile(cenlat,18)
+var num18trow=Math.pow(2,18)-1
+var _k=tileSizeRoot/num18trow
+var coordx=_x*_k-1727122.6368
+var coordz=_z*_k-1727122.6368
+var tilesize=(lon2tile(maxlon,18)-lon2tile(minlon,18))*13.1769
+var coordy=tilesize*UnitToPixelScale/256  ; //256-na lvl nige512	
+camera.position.set(coordx, coordy, coordz);
+controls.target.x+=coordx
+controls.target.z+=coordz
+
+			
+//format http://www.openstreetmap.org/?mlat=55.75222&mlon=37.61556&zoom=12				
+/*var cenlon=34
+var cenlat=44.5
+var zoom=10
+var _x=lon2tile(cenlon,zoom)
+var _z=lat2tile(cenlat,zoom)
+var lon1=tile2lon(_x,12);
+var lon2=tile2lon(_x+1,12);
+var numzoomtrow=Math.pow(2,zoom)-1
+var _k=tileSizeRoot/numzoomtrow
+var coordx=_x*_k-1727122.6368
+var coordz=_z*_k-1727122.6368
+var tilesize=(lon2tile(Math.max(lon2,lon1),12)-lon2tile(Math.min(lon2,lon1),12))*Math.pow(2,18-12)*13.1769
+var coordy=tilesize*UnitToPixelScale/512  ; //256-na lvl nige	
+camera.position.set(coordx, coordy, coordz);
+controls.target.x+=coordx
+controls.target.z+=coordz*/
 
 				//controls.rotateSpeed = 0.01;
 
 				controls.addEventListener( 'change', checkTiles );
-                //timerid=setInterval(render, 24);
+                timerid=setTimeout(verify, 35);
 				
 				//scene
                 scene = new THREE.Scene();
@@ -252,7 +398,7 @@ function getTanDeg(deg) {
 				
 				// renderer
 
-				renderer = new THREE.WebGLRenderer( { antialias: false ,preserveDrawingBuffer: true } );
+				renderer = new THREE.WebGLRenderer( { antialias: false  } );//,preserveDrawingBuffer: true
 				//renderer.setClearColor( scene.fog.color, 1 );
 				//renderer.setDepthTest(true);
 				//renderer.autoClear = true;
@@ -268,7 +414,7 @@ function getTanDeg(deg) {
 				stats.domElement.style.position = 'absolute';
 				stats.domElement.style.top = '0px';
 				stats.domElement.style.zIndex = 100;
-				//container.appendChild( stats.domElement );
+				container.appendChild( stats.domElement );
 
 				//
 
@@ -293,11 +439,12 @@ function getTanDeg(deg) {
 				   if ((event = event || window.event).keyCode == 40)camera.center.z+=0.25
 	           }*/
 			   
-			   //timerid=setInterval(verify, 20);
-			   
 			   //land_func(300)
 			   
-			   document.addEventListener('keydown',onDocumentKeyDown,false);
+			  verdrop(0,0,0,0);
+			  //for (var beg=initTiles.length -1;beg>=0;beg--)TLoad.pushTile(initTiles[beg]);
+              for (var beg=0;beg<initTiles.length;beg++)TLoad.pushTile(initTiles[beg]);
+			  //document.addEventListener('keydown',onDocumentKeyDown,false);
 
 			}
 			
@@ -348,14 +495,14 @@ function getTanDeg(deg) {
                 	for(v=1.0;v>0;v-=step){
                 	  for(u=0.0;u<1;u+=step){
                 	tile.triangleGeometry.faceVertexUvs[0].push( [
-                            new THREE.UV( u, v ),
-                            new THREE.UV( u+step, v ),
-                			new THREE.UV( u, v-step )
+                            new THREE.Vector2(u, v) ,
+                            new THREE.Vector2(u+step, v) ,
+                			new THREE.Vector2(u, v-step)
                         ] );
                 	tile.triangleGeometry.faceVertexUvs[0].push( [
-                            new THREE.UV( u+step, v ),
-                            new THREE.UV( u+step, v-step ),
-                            new THREE.UV( u, v-step )
+                            new THREE.Vector2(u+step, v ) ,
+                            new THREE.Vector2(u+step, v-step) ,
+                            new THREE.Vector2(u, v-step) 
                         ] );
                 		                      }
 	                	                   }			
@@ -366,7 +513,7 @@ function getTanDeg(deg) {
 			//function is called in response to a request from the server to get the tile by id
 			function responseServer(s) {
 			
-				tileId=-1;
+				var tileId=-1;
 				var flagroot=false;
 				var findtile=false;
 				var jstr;
@@ -377,11 +524,58 @@ function getTanDeg(deg) {
 				var id =Math.abs(jstr.id);
 				for(t=0;/*t<=TLoad.maxid*/;t=(t*4+4)){lvl++;if(id<=t)break}
 				if(lvl<=18)jstr.id=id;
-				console.debug("lvl "+lvl+" jstr.id "+jstr.id)
 				}
 				if(jstr.verts[0]==undefined)flg_empty=true;
+
 				
-                if(jstr.id>=0){				
+                if(jstr.id>=0){	
+
+				/***************/
+				if(arrTile[jstr.id]!=undefined){
+				var tileId=jstr.id
+				arrTile[tileId].prnt=jstr.id==0?-1:((jstr.id-1)-((jstr.id-1)%4))/4;
+
+				var var1=Math.pow(2,arrTile[tileId].lvl);//number of tiles in row (specific lvl) 
+				scale=jstr.id==0?TLoad.stepGrid:TLoad.stepGrid/(var1);//determine a width and a height of cell
+				//console.debug("scale "+scale+" tile.id "+arrTile[tileId].id+" tile.lvl "+arrTile[tileId].lvl)
+				var offset=jstr.id==0?0:Math.abs(2*TLoad.startX)/(var1);  // determine an offset for 1st tile of specific lvl 
+				//count 1st coordinates for concrete tile
+				var startX=TLoad.startX+offset*arrTile[tileId].tex_x;
+				var startZ=TLoad.startZ+offset*arrTile[tileId].tex_z;
+				//console.debug("tileId "+tileId)
+				//console.debug("startX "+startX)
+				//console.debug("startZ "+startZ)
+				var x_=-1;
+				var z_=-1;
+				var index_=0;
+				var i_=0;
+				var j_=0;
+				//Creation of a grid
+                    for(;i_<9;i_++){
+					    z_=startZ+(scale)*i_;
+					   for(;j_<9;j_++){
+					      x_=startX+(scale)*j_;
+		                  arrTile[tileId].triangleGeometry.vertices.push(new THREE.Vector3( x_,flg_empty?0.0:(0.1*parseFloat(jstr.verts[index_])),z_));
+						  //if(!flg_empty)alert(jstr.id+" "+parseFloat(jstr.verts[0]))
+						  //console.debug("flg_empty "+flg_empty);
+				          //console.debug("index "+index_+" x "+x_+" jstr.verts[index] "+jstr.verts[index_]+" z "+z_);
+						  index_++;
+						             }
+									 j_=0;
+											};
+				initFaceTex(arrTile[tileId]);
+				
+				var tex=''+arrTile[tileId].lvl+'/'+arrTile[tileId].tex_x+'/'+arrTile[tileId].tex_z;
+				arrTex[tileId]=THREE.ImageUtils.loadTexture('http://c.tile.openstreetmap.org/'+tex+".png",new THREE.UVMapping(),function()
+				 {
+				   crtMesh(tileId);
+				   arrCurRoot.push(tileId);
+				   render();
+				 })
+                //arrTile[tileId].texExist=true;
+				
+				}else{
+				
 				 for(j in arrCurRoot){
 				     cur_ID=arrCurRoot[j];
 		
@@ -404,30 +598,8 @@ function getTanDeg(deg) {
 				arrTile[tileId].tex_x=arrTile[(tileId*4+1)].tex_x/2;
 				arrTile[tileId].tex_z=arrTile[(tileId*4+1)].tex_z/2;
 				flagroot=true;}
-				
-				if(!Exist1stTl){
-				
-				if(jstr.id==0){
-				tileId=jstr.id;
-				arrTile[tileId]=new Tile();
-				arrTile[tileId].id=jstr.id;
-				arrTile[tileId].lvl=0;
-				//arrTile[tileId].prnt=-1;
-				arrTile[tileId].tex_x=0;
-				arrTile[tileId].tex_z=0;
-					
-				console.debug("Init done crt Root Tile  "+jstr.id+" ");
-				//determine a width and a height of cell
-				TLoad.stepGrid=(Math.abs(TLoad.startX)*2)/8;
-
-                            }
-				
-				}
 								
                 if(tileId>=0){
-							
-				var tex=''+arrTile[tileId].lvl+'/'+arrTile[tileId].tex_x+'/'+arrTile[tileId].tex_z;
-				arrTex[tileId]=THREE.ImageUtils.loadTexture('http://c.tile.openstreetmap.org/'+tex+".png",new THREE.UVMapping(),function(){/*triangleMesh[tileId].visible=true;*/renderer.render( scene, camera );})
 
 				arrTile[tileId].prnt=jstr.id==0?-1:((jstr.id-1)-((jstr.id-1)%4))/4;
 
@@ -451,7 +623,7 @@ function getTanDeg(deg) {
 					    z_=startZ+(scale)*i_;
 					   for(;j_<9;j_++){
 					      x_=startX+(scale)*j_;
-		                  arrTile[tileId].triangleGeometry.vertices.push(new THREE.Vector3( x_,0.0/*flg_empty?442.0:(80000*parseFloat(jstr.verts[index_]))*/,z_));
+		                  arrTile[tileId].triangleGeometry.vertices.push(new THREE.Vector3( x_,flg_empty?0.0:(0.1*parseFloat(jstr.verts[index_])),z_));
 						  //console.debug("flg_empty "+flg_empty);
 				          //console.debug("index "+index_+" x "+x_+" jstr.verts[index] "+jstr.verts[index_]+" z "+z_);
 						  index_++;
@@ -460,35 +632,35 @@ function getTanDeg(deg) {
 											};
 				initFaceTex(arrTile[tileId]);
 				
-				if(!Exist1stTl){
+				/*if(!Exist1stTl){
 				  Exist1stTl=true;
 				  crtMesh(tileId);
                   arrCurRoot.unshift(tileId);
                   render();				  
-					           }
-				
-				}
-				
-				if(flagroot){
+					           }*/
+							   
+				var tex=''+arrTile[tileId].lvl+'/'+arrTile[tileId].tex_x+'/'+arrTile[tileId].tex_z;
+				arrTex[tileId]=THREE.ImageUtils.loadTexture('http://c.tile.openstreetmap.org/'+tex+".png",new THREE.UVMapping(),function()
+				  {
+				     arrTile[tileId].texExist=true;
+					 if(flagroot){
 				
 					//console.debug("tex x  "+arrTile[tileId].tex_x+" y "+arrTile[tileId].tex_y);
-					console.debug("crt  "+jstr.id+" ");
-					console.debug("del  "+(jstr.id*4+1)+" ");
-					console.debug("del  "+(jstr.id*4+2)+" ");
-					console.debug("del  "+(jstr.id*4+3)+" ");
-					console.debug("del  "+(jstr.id*4+4)+" ");
-					crtMesh(jstr.id);
+					console.debug("crt  "+tileId+" ");
+					console.debug("del  "+(tileId*4+1)+" ");
+					console.debug("del  "+(tileId*4+2)+" ");
+					console.debug("del  "+(tileId*4+3)+" ");
+					console.debug("del  "+(tileId*4+4)+" ");
+					crtMesh(tileId);
 					
-					
-                    deltilemesh((jstr.id*4+1));
-					deltilemesh((jstr.id*4+2));
-					deltilemesh((jstr.id*4+3));
-					deltilemesh((jstr.id*4+4));
-					deltile((jstr.id*4+1));
-					deltile((jstr.id*4+2));
-					deltile((jstr.id*4+3));
-					deltile((jstr.id*4+4));
-					
+                    deltilemesh((tileId*4+1));
+					deltilemesh((tileId*4+2));
+					deltilemesh((tileId*4+3));
+					deltilemesh((tileId*4+4));
+					deltile((tileId*4+1));
+					deltile((tileId*4+2));
+					deltile((tileId*4+3));
+					deltile((tileId*4+4));
 					arrCurRoot.unshift(tileId);
 					TLoad.idforloadroot=-1;
 		            TLoad.ReadyForRoot=true;
@@ -498,6 +670,13 @@ function getTanDeg(deg) {
 					
 					render();
                             }
+					 })			    
+				
+				}
+				
+
+							
+					}
 				
                     }else{console.debug("! Reject request id is out of range!");}
 					 //r=(delete tile);
@@ -534,13 +713,14 @@ function getTanDeg(deg) {
                             new THREE.CubeGeometry(0.25,0.2,0.25),
                            //new THREE.MeshBasicMaterial({color: 0x000000, opacity: 1})
 				           new THREE.MeshBasicMaterial({
-				           color: 0x000000//,
+				           color: 0xd78254//,
 				           //'map':texture,
 				           //wireframe: false,
 				           //side:THREE.DoubleSide,
                            //'overdraw': true
 				                })
                             );
+
 			    var lon=parseFloat(jstr.builds[j].positionLon);///OSM_w;
                 var lat=parseFloat(jstr.builds[j].positionLat);///OSM_h;
 			    MeshOfBlds[b].position.set(arrTileBlds[id].x+(lon-arrTileBlds[id].minlon)*arrTileBlds[id].scale_x,0.5,arrTileBlds[id].z-(lat-arrTileBlds[id].minlat)*arrTileBlds[id].scale_z);
@@ -572,6 +752,7 @@ function getTanDeg(deg) {
 			function animate() {
 
 				requestAnimationFrame( animate );
+				//render();
 				controls.update();
 
 			}
@@ -613,7 +794,7 @@ function getTanDeg(deg) {
 				var cD=Math.sqrt(ax*ax+ay*ay+az*az);*/
 				//cD=1 * cD.toFixed(1)
 				//console.debug("cR "+cD+"lvl "+tlvl)
-                return tilecenter.subSelf(cam.position).length();				
+                return tilecenter.sub(cam.position).length();				
 			}
 			
 			function deltilemesh(id,req){
@@ -644,7 +825,9 @@ function getTanDeg(deg) {
 
             function deltile(id,req){
                 if(req==false)req=false;
-				else{req=true;}			
+				else{req=true;}
+                var dist=getDistance(camera,arrTile[id].lvl,arrTile[id].tex_x,arrTile[id].tex_z);
+				if(arrTileBlds[id]&&dist>=230)delbuildsoftile(id);
 				arrTile[id].destroy();
 				delete arrTile[id];
 				arrTile[id]=null;
@@ -654,13 +837,13 @@ function getTanDeg(deg) {
 				  if(arrTile[(id*4+3)])deltile((id*4+3));
 				  if(arrTile[(id*4+4)])deltile((id*4+4));
 				}
-				delbuildsoftile(id);
+				
 				console.debug("Delete "+arrTile[id]+" id "+id)
 			}
 			
 			function delbuildsoftile(id){
-			    if(arrTileBlds[id]&&!arrTile[(id*4+1)]){
-				  //alert("del "+id+" "+arrTileBlds[id].arrIndxsBlds[0])
+			    if(arrTileBlds[id]){
+				  //alert("del "+id+" "+id)
 				  if(arrTileBlds[id].arrIndxsBlds[0]!=undefined)
 				    {
 					//alert("del arrTileBlds[id].arrIndxsBlds.length() "+arrTileBlds[id].arrIndxsBlds.length())
@@ -683,13 +866,11 @@ function getTanDeg(deg) {
 				  arrTileBlds[id]=null;
 				 }
 			
-					 
-		 
-		   
 		
 			}
 			
 			function crtMesh(id){
+
 			    //var tex=''+arrTile[id].lvl+'/'+arrTile[id].tex_x+'/'+arrTile[id].tex_z;
                 //var texture=THREE.ImageUtils.loadTexture('http://c.tile.openstreetmap.org/'+tex+".png",new THREE.UVMapping(),function(){triangleMesh[id].visible=true;renderer.render( scene, camera );})
 		        //arrTex[id].generateMipmaps = true;//texture
@@ -708,8 +889,9 @@ function getTanDeg(deg) {
 				triangleMesh[id].position.set(0.0, 0.0, 0.0);
 				scene.add(triangleMesh[id]);
 				triangleMesh[id].visible=true;
+				//if(arrTile[id].lvl>15)triangleMesh[id].visible=false;
 				
-				//console.debug("Crt "+triangleMesh[id]+" id "+id)
+				console.debug("Crt "+triangleMesh[id]+" id "+id)
 
 			}
 			
@@ -776,10 +958,12 @@ function getTanDeg(deg) {
 				if(arrTile[cur_ID].childs[2]<0){TLoad.pushTile(cur_ID*4+3);chldsExist=false;}
 				if(arrTile[cur_ID].childs[3]<0){TLoad.pushTile(cur_ID*4+4);chldsExist=false;}
 				}
-							
+									
 				//drop to the level below (divide by 4 quad)
 				   if(flagDrop&&chldsExist){
-				    
+				   
+				   var flg=arrTile[cur_ID*4+1].texExist&&arrTile[cur_ID*4+2].texExist&&arrTile[cur_ID*4+3].texExist&&arrTile[cur_ID*4+4].texExist
+				   if(flg){
 					deltilemesh(cur_ID,false)
 					deltile(cur_ID,false)
 
@@ -799,7 +983,8 @@ function getTanDeg(deg) {
 					
                     //render();					
 					//console.debug("break ")
-					break;			
+					break;
+                     }					
                                 }
 				    
 				            }
@@ -865,9 +1050,22 @@ function getTanDeg(deg) {
 							
                                        }
 					
-				if(TLoad)TLoad.loadTile();
+				//if(TLoad)TLoad.loadTile();
                 render();
+				
+				if(TLoad&&!bverify){
+			     if(TLoad.needforload()){bverify=true;timerid=setTimeout(verify, 35);}
+				}
 			
+			}
+			
+			function verify(){
+                //checkTiles();
+				
+				if(TLoad){
+			     if(TLoad.needforload()){TLoad.loadTile();timerid=setTimeout(verify, 35);}
+				 else{bverify=false;}
+				}
 			}
 			
 			function render() {
@@ -876,6 +1074,7 @@ function getTanDeg(deg) {
 				*/
                 //renderer.clear(true, true, true);
 				//renderer.context.depthMask( true );
+				//controls.update();
                 renderer.render( scene, camera);
 				stats.update();
 			}
